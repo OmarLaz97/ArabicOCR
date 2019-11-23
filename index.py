@@ -1,8 +1,8 @@
-import numpy as np
-import skimage.io as io
-from skimage.morphology import selem, binary_erosion, binary_dilation, binary_closing, skeletonize, thin, binary_opening
 import cv2
+import skimage.io as io
+from skimage.morphology import selem, binary_opening
 from skimage.viewer import ImageViewer
+
 from utilityFunctions.preProcessing import Baseline
 
 # Reading the image
