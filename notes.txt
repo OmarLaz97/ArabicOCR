@@ -1,0 +1,8 @@
+# things that may come handy sebouha
+# image = cv2.resize(image, None, fx=5, fy=5, interpolation=cv2.INTER_CUBIC)
+#
+# window = selem.square(2)
+# image = filters.rank.minimum(image, window)
+#
+# # some how be di gebt el line fein
+# # image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 51, 0)
