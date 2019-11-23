@@ -6,7 +6,7 @@ from skimage.viewer import ImageViewer
 from utilityFunctions.preProcessing import Baseline
 
 # Reading the image
-# TODO: capr1.png bayza 5ales !
+# FIXME: capr1.png bayza 5ales !
 # TODO: Maybe we need to divide pictures with length bigger than a certain threshold ????
 img = io.imread('./testImages/capr1.png')
 viewer = ImageViewer(img)
