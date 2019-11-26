@@ -6,3 +6,27 @@
 #
 # # some how be di gebt el line fein
 # # image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 51, 0)
+
+
+
+def getAvgZero(indexArrays):
+    avg = []
+    tempStart = indexArrays[0][0]
+    start = tempStart
+    for i in range(1, len(indexArrays[0])):
+        x= indexArrays[0][i]
+        if indexArrays[0][i] == (tempStart + 1):
+            tempStart = indexArrays[0][i]
+            continue
+        end = indexArrays[0][i-1]
+
+        if end - start <= 9:
+            continue
+        average = end + start
+        average = int(average/2)
+        avg.append(average)
+
+        tempStart = indexArrays[0][i]
+        start = tempStart
+
+    return avg

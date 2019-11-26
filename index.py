@@ -1,14 +1,13 @@
-import cv2
 import skimage.io as io
 from skimage.morphology import selem, binary_opening
 from skimage.viewer import ImageViewer
 
-from utilityFunctions.preProcessing import Baseline
+from utilityFunctions.preProcessing import *
 
 # Reading the image
 # FIXME: capr1.png bayza 5ales !
 # TODO: Maybe we need to divide pictures with length bigger than a certain threshold ????
-img = io.imread('./testImages/capr1.png')
+img = io.imread('./testImages/capr3.png')
 viewer = ImageViewer(img)
 viewer.show()
 
@@ -24,10 +23,14 @@ viewer = ImageViewer(op)
 viewer.show()
 
 # Get the Baseline of the image
-image, maximas = Baseline(image)
+rotatedImage, baselinedImage, maximas = Baseline(image)
+viewer = ImageViewer(baselinedImage)
+viewer.show()
 
-# Drawing the base lines
-for i in range(len(maximas[0])):
-    img = cv2.line(image, (0, maximas[0][i]), (img.shape[1], maximas[0][i]), (255, 0, 0), 1)
-viewer = ImageViewer(img)
+# Get the line breaks of the image from the maximas array
+lineBreakedImg, lineBreaks = getLineBreaks(rotatedImage, maximas)
+
+# Segmenting the lines and words
+linesWordsSegmented = wordSegmentation(rotatedImage, lineBreaks)
+viewer = ImageViewer(linesWordsSegmented)
 viewer.show()
