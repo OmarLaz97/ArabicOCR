@@ -6,13 +6,14 @@ from sklearn.neighbors import KernelDensity
 
 
 # function to get fix a rotated image and get the baseline
-def Baseline(image):
+def skewNormal(image):
     """
-
     :param image: Binary Image
     :return: rotatedImage, rotated image with baselines and maximas array
     """
-    img = image.copy()
+
+    # Local Thresholding momken neghayar fih ba3dein
+    img = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 5, 10)
 
     # Calculate horizontal projection
     # Smoothing out the projection to reduce the noise
@@ -26,8 +27,9 @@ def Baseline(image):
     dir = -1
 
     while True:
-        rotImg = trans.rotate(img, 0.1 * counter * dir)
-        rotImg[rotImg > 0] = 255
+        rotImg = trans.rotate(image, 0.1 * counter * dir, mode="edge")
+        rotImg = (rotImg * 255).astype(np.uint8)
+        rotImg = cv2.adaptiveThreshold(rotImg, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 5, 10)
 
         # Calculate horizontal projection
         window = [1, 1, 1]
@@ -39,11 +41,13 @@ def Baseline(image):
         # beyeb2o akbar men el soura el asleya fa lazem at2aked min fihom ely akbar men tani
         # plus min fihom akbar men el soura el asleya
         if not checked:
-            rotImg2 = trans.rotate(img, 0.1 * counter * -dir)
-            rotImg2[rotImg2 > 0] = 255
+            rotImg2 = trans.rotate(image, 0.1 * counter * -dir, mode="edge")
+            rotImg2 = (rotImg2 * 255).astype(np.uint8)
+            rotImg2 = cv2.adaptiveThreshold(rotImg2, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 5, 10)
             testProj2 = np.sum(rotImg2, 1)
 
-        if (proj2[maximas[0][0]] < proj[maximas[0][0]] or proj2[maximas[0][0]] < testProj2[maximas[0][0]]) and not checked:
+        if (proj2[maximas[0][0]] < proj[maximas[0][0]] or proj2[maximas[0][0]] < testProj2[
+            maximas[0][0]]) and not checked:
             dir = -1 * dir
             checked = True
             continue
@@ -58,24 +62,33 @@ def Baseline(image):
 
     # Counter - 1 3ashan ana ba3mel fel code counter + 1 ba3d keda ba3mel check law a7san wala la2
     # fa lazem a3mel counter - 1 3ashan da haykoun el adim el a7san
-    rotatedImg = trans.rotate(img, 0.1 * (counter - 1) * dir)
+    angle = 0.1 * (counter - 2) * dir
 
-    # Thresholding tany 3ashan el rotation betraga3 greyscale image
-    rotatedImg = (rotatedImg * 255).astype(np.uint8)
-    rotatedImg = cv2.adaptiveThreshold(rotatedImg, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 81, -100)
+    return angle
 
-    baseLinedImage = rotatedImg.copy()
-    # Drawing the base lines
+
+# Draw The Baselines over the image
+def Baseline(image):
+    """
+    :param image: skew corrected binary image
+    :return:
+    """
+    window = [1, 1, 1, 1, 1]
+    proj = np.sum(image, 1)
+    ConvProj = np.convolve(proj, window)
+    maximas = argrelextrema(ConvProj, np.greater)
+
+    baseLinedImage = image.copy()
     for i in range(len(maximas[0])):
-        baseLinedImage = cv2.line(baseLinedImage, (0, maximas[0][i]), (rotatedImg.shape[1], maximas[0][i]), (255, 0, 0), 1)
+        baseLinedImage = cv2.line(baseLinedImage, (0, maximas[0][i]), (baseLinedImage.shape[1], maximas[0][i]),
+                                  (255, 0, 0), 1)
 
-    return rotatedImg, baseLinedImage, maximas
+    return baseLinedImage, maximas
 
 
 # Function to get where each line ends and save the row values in an array for further line segmentation
 def getLineBreaks(image, maximas):
     """
-
     :param image: binary image
     :param maximas: lines breaks images and the line breaks array
     :return:
