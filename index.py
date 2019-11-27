@@ -1,5 +1,5 @@
 import skimage.io as io
-from skimage.morphology import selem, binary_opening
+from skimage.morphology import skeletonize
 from skimage.viewer import ImageViewer
 
 from utilityFunctions.preProcessing import *
@@ -27,10 +27,17 @@ viewer.show()
 
 
 # TODO: EL morphological operations lessa masta5demnahash + enena lessa ma3amlnash noise reduction
-window = selem.rectangle(2, 1)
-op = binary_opening(newImage, window)
-viewer = ImageViewer(op)
+# window = selem.rectangle(2, 1)
+# op = binary_opening(newImage, window)
+# viewer = ImageViewer(op)
+# viewer.show()
+
+# Skeletonize the image to get the minimum possible data to work with
+newImage = (newImage / 255).astype(np.uint8)
+newImage = skeletonize(newImage)
+viewer = ImageViewer(newImage)
 viewer.show()
+newImage = (newImage * 255).astype(np.uint8)
 
 # Get the Baseline of the image
 # baselinedImage,

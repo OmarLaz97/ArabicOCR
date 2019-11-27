@@ -73,7 +73,7 @@ def Baseline(image):
     :param image: skew corrected binary image
     :return:
     """
-    window = [1, 1, 1, 1, 1]
+    window = [1, 1, 1, 1, 1, 1]
     proj = np.sum(image, 1)
     ConvProj = np.convolve(proj, window)
     maximas = argrelextrema(ConvProj, np.greater)
@@ -132,7 +132,7 @@ def wordSegmentation(image, lineBreaks):
 
         # Hane3mel vertical projection 3adi ba3d
         # Keda hane3mel convolution 3ashan ne smooth el curve
-        window = [1, 1, 1]
+        window = [1, 1, 1, 1, 1]
         horPro = np.sum(line, 0)
         ConvProj = np.convolve(horPro, window)
 
