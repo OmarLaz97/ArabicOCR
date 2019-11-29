@@ -2,8 +2,8 @@ import cv2
 import numpy as np
 import skimage.transform as trans
 from scipy.signal import argrelextrema
+from skimage.viewer import ImageViewer
 from sklearn.neighbors import KernelDensity
-
 
 # function to get fix a rotated image and get the baseline
 def skewNormal(image):
@@ -111,9 +111,118 @@ def getLineBreaks(image, maximas):
 
     return img, lineBreaks
 
+def descenderSegmentation(img, y1, y2, x1, x2, segmented, baseline):
+    # function implementing match template algorithm using the template below to detect descender chars
+
+    # viewer = ImageViewer(img[y1:y2, x1:x2])
+    # viewer.show()
+    template = ([[0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 1, 1, 1, 1],
+                [0, 0, 0, 1, 1, 1, 1, 1],
+                [0, 0, 0, 1, 1, 1, 1, 1],
+                [0, 0, 0, 1, 1, 1, 1, 1],
+                [0, 0, 0, 1, 1, 1, 1, 1]])
+
+    # width and length of template
+    w, l = 8, 7
+
+    template = (np.asarray(template)).astype(np.float32)
+    img = np.asarray(img).astype(np.float32)
+
+    # loop on the base line only (and a small area around based on the chosen template)
+    # the res is a -ve number if most of the pixels are above the baseline, +ve if below
+    res = cv2.matchTemplate(img[baseline - 2: baseline + 5, x1:x2], template, cv2.TM_CCOEFF)
+    res = np.asarray(res)
+
+    #+ve res are our interest so, search for first negative number
+    negNumbers = np.where(res < 0.0)
+
+    # if no negative numbers, it means it may be a single letter like (noon) and we don't segment
+    if (len(negNumbers[1]) == 0):
+        return segmented
+
+    # (pos of last positive = pos of first negative -1)
+    threshold = negNumbers[1][0] - 1
+
+    # if the first negative number is at pos 0 (last pos at -1), it means there are no descender chars, return
+    if threshold < 0:
+        return segmented
+
+    # PROBLEM HERE: problems occur here as some cases aren't supposed to be segmented, but they get to this point
+    # and are falsely segmented
+
+    # otherwise, there is a chance we have a desc char segmented at the following loc
+    loc = x1 + threshold + w -1
+
+    segmented = cv2.line(segmented, (loc, y1), (loc, y2), (255, 0, 0), 1)
+
+    # viewer = ImageViewer(segmented)
+    # viewer.show()
+
+    return segmented
+
+# the function works on the original image with the specified Xs and Ys
+# and return segmented image that contains the lines of different segmentation
+def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline):
+
+    # viewer = ImageViewer(img[y1:y2, x1:x2])
+    # viewer.show()
+
+    # get projection
+    horPro = np.sum(img[y1:y2, x1:x2], 0)
+
+    # get indices of non zeros (to be able to detect the start and end of word and ignore background)
+    # and return if all are zeros
+    indexOfNonZeros =  [i for i, e in enumerate(horPro) if e != 0]
+    if (len(indexOfNonZeros) == 0):
+        return segmented
+
+    # replace the two clusters of zeros on the 2 extremes(background) by -1 so that only zeros within the word is considered
+    horPro[0:indexOfNonZeros[0]] = -1
+    horPro[indexOfNonZeros[-1]:len(horPro)] = -1
+
+    # get the zeros within word
+    zeroCrossings = np.where(horPro== 0.0)
+
+    # if no zeros found, return
+    if (len(zeroCrossings[0])==0):
+        return segmented
+
+    # getting positions of lines accurately (similar to wordSegmentation function)
+    kde = KernelDensity().fit(zeroCrossings[0][:, None])
+
+    bins = np.linspace(0, img[y1:y2, x1:x2].shape[1], img[y1:y2, x1:x2].shape[1])
+
+    logProb = kde.score_samples(bins[:, None])
+
+    prob = np.exp(logProb)
+
+    maximasTest = argrelextrema(prob, np.greater)
+
+    # append 0 at the beginning for drawing
+    maximasTest2 = [0]
+
+    for i in range(len(maximasTest[0])):
+        maximasTest2.append(maximasTest[0][i])
+
+    #for drawing
+    maximasTest2.append(x2-x1)
+
+    # for each subword, get characters
+    for j in range(len(maximasTest2)-1):
+        # first step in getting characters is looping on each sub word and find descender characters and segment them
+        # currently commented as it's not very accurate
+        # descenderSegmentation(img, y1, y2, x1 + maximasTest2[j], x1+ maximasTest2[j+1], segmented, baseline)
+
+        segmented = cv2.line(segmented, (x1+ maximasTest2[j], y1), (x1 + maximasTest2[j], y2), (255, 0, 0), 1)
+
+        # viewer = ImageViewer(segmented)
+        # viewer.show()
+    return segmented
 
 # Function to segment the lines and words in these lines
-def wordSegmentation(image, lineBreaks):
+def wordSegmentation(image, lineBreaks, maximas):
     """
 
     :param image: binary image
@@ -158,12 +267,24 @@ def wordSegmentation(image, lineBreaks):
         # Law gebna el maximas beta3et el prob array da hateb2a heya di amaken el at3 mazbouta inshallah
         maximasTest = argrelextrema(prob, np.greater)
 
-        top, bottom = lineBreaks[i] + 5, lineBreaks[i + 1] - 5
+        top, bottom = lineBreaks[i], lineBreaks[i + 1]
 
+        # for each word in the current line
         for j in range(len(maximasTest[0]) - 1):
             # word = np.copy(line)
             # word = word[:, maximasTest[0][j]: maximasTest[0][j+1]]
             left, right = maximasTest[0][j], maximasTest[0][j + 1]
-            cv2.rectangle(segmented, (left, top), (right, bottom), (255, 0, 0), 1)
+
+            # for each word, divide it into sub-words
+            segmented = subWordSegmentation(image, segmented, top, bottom, left, right, maximas[0][i])
+
+            segmented = cv2.rectangle(segmented, (left, top), (right, bottom), (255, 0, 0), 1)
+
+            # viewer = ImageViewer(segmented)
+            # viewer.show()
+
+
+        # if i == 0:
+        #     cv2.imwrite('Sultan.png', line[:, maximasTest[0][0]: maximasTest[0][1]])
 
     return segmented

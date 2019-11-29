@@ -25,7 +25,6 @@ newImage = cv2.adaptiveThreshold(newImage, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.
 viewer = ImageViewer(newImage)
 viewer.show()
 
-
 # TODO: EL morphological operations lessa masta5demnahash + enena lessa ma3amlnash noise reduction
 # window = selem.rectangle(2, 1)
 # op = binary_opening(newImage, window)
@@ -49,6 +48,6 @@ viewer.show()
 lineBreakedImg, lineBreaks = getLineBreaks(newImage, maximas)
 
 # Segmenting the lines and words
-linesWordsSegmented = wordSegmentation(newImage, lineBreaks)
+linesWordsSegmented = wordSegmentation(newImage, lineBreaks, maximas)
 viewer = ImageViewer(linesWordsSegmented)
 viewer.show()
