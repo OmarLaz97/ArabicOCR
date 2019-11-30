@@ -4,6 +4,7 @@ import skimage.transform as trans
 from scipy.signal import argrelextrema
 from skimage.viewer import ImageViewer
 from sklearn.neighbors import KernelDensity
+import skimage.graph
 
 # function to get fix a rotated image and get the baseline
 def skewNormal(image):
@@ -66,7 +67,6 @@ def skewNormal(image):
 
     return angle
 
-
 # Draw The Baselines over the image
 def Baseline(image):
     """
@@ -80,11 +80,9 @@ def Baseline(image):
 
     baseLinedImage = image.copy()
     for i in range(len(maximas[0])):
-        baseLinedImage = cv2.line(baseLinedImage, (0, maximas[0][i]), (baseLinedImage.shape[1], maximas[0][i]),
-                                  (255, 0, 0), 1)
+        baseLinedImage = cv2.line(baseLinedImage, (0, maximas[0][i]), (baseLinedImage.shape[1], maximas[0][i]), (255, 0, 0), 1)
 
     return baseLinedImage, maximas
-
 
 # Function to get where each line ends and save the row values in an array for further line segmentation
 def getLineBreaks(image, maximas):
@@ -111,120 +109,113 @@ def getLineBreaks(image, maximas):
 
     return img, lineBreaks
 
-def descenderSegmentation(img, y1, y2, x1, x2, segmented, baseline):
-    # function implementing match template algorithm using the template below to detect descender chars
+def getMaxTransitions(image, y1, baslineIndex):
+    maxTransitions = 0
+    transPositions = []
+    maxTransitionsIndex = baslineIndex
+    i = baslineIndex
+    while i > y1:
+        currentTransitions = 0
+        currentTransPositions = []
+        flag = image[i][0]  #is always zero as beg of line is background
+        j = 1
+        while j < image.shape[1]:
+            if image[i][j] == 255 and flag == 0:
+                currentTransPositions.append(j)
+                currentTransitions += 1
+                flag = 1
+            elif image[i][j] == 0 and flag ==1:
+                currentTransPositions.append(j)
+                flag = 0
+            j+=1
 
-    # viewer = ImageViewer(img[y1:y2, x1:x2])
+        if currentTransitions >= maxTransitions:
+            maxTransitions = currentTransitions
+            transPositions = currentTransPositions
+            maxTransitionsIndex = i
+
+        i -= 1
+
+    transPositions = transPositions[1:len(transPositions) - 1]
+    return maxTransitionsIndex, transPositions
+
+def getAllCutEdges(x1, x2, transPositions, projections, MFV):
+    cutPositions = []
+
+    currentTransPositions = [i for i in transPositions if i > x1 and i < x2]
+    currentTransPositions = currentTransPositions[::-1]
+
+    if len(currentTransPositions) <= 1:
+        return currentTransPositions, cutPositions
+
+    for i in range(0, len(currentTransPositions) -1, 2):
+        startIndex = currentTransPositions[i]
+        if i+1 >= len(currentTransPositions):
+            break
+        endIndex = currentTransPositions[i+1]
+
+        middleIndex = int((startIndex + endIndex)/2)
+
+        if projections[middleIndex] == 0.0 or projections[middleIndex] == MFV:
+            cutPositions.append(middleIndex)
+            continue
+
+        found = False
+        k = middleIndex - 1
+        while k >= endIndex:
+            if projections[middleIndex] == 0.0 or projections[middleIndex] == MFV:
+                found = True
+                cutPositions.append(k)
+                break
+            k-=1
+
+        if found:
+            continue
+        else:
+            k = middleIndex + 1
+            while k <= startIndex:
+                if projections[middleIndex] == 0.0 or projections[middleIndex] == MFV:
+                    found = True
+                    cutPositions.append(k)
+                    break
+                k+=1
+
+            if found:
+                continue
+            else:
+                cutPositions.append(middleIndex)
+
+    return currentTransPositions, cutPositions
+
+def getFilteredCutPoints(image, x1, x2, y1, y2, currentTransPositions, cutPositions, projections, baseline):
+    # viewer = ImageViewer(image[y1:y2, x1:x2])
     # viewer.show()
-    template = ([[0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 1, 1, 1, 1],
-                [0, 0, 0, 1, 1, 1, 1, 1],
-                [0, 0, 0, 1, 1, 1, 1, 1],
-                [0, 0, 0, 1, 1, 1, 1, 1],
-                [0, 0, 0, 1, 1, 1, 1, 1]])
+    filteredCuts = []
+    # for each region
+    cut = 0
+    for i in range(0, len(currentTransPositions) -1, 2):
+        startIndex = currentTransPositions[i]
+        endIndex = currentTransPositions[i+1]
 
-    # width and length of template
-    w, l = 8, 7
+        cutIndex = cutPositions[cut]
+        cut +=1
 
-    template = (np.asarray(template)).astype(np.float32)
-    img = np.asarray(img).astype(np.float32)
+        # the separation region is valid if there is no connected path between the start and the end index of a current region
+        # path = False
+        # for k in range(endIndex, startIndex):
+        #     if image[baseline][k] != 0:
+        #         path = True
+        #         break
+        #
+        # if not path:
+        #     filteredCuts.append(cutIndex)
+        #     continue
 
-    # loop on the base line only (and a small area around based on the chosen template)
-    # the res is a -ve number if most of the pixels are above the baseline, +ve if below
-    res = cv2.matchTemplate(img[baseline - 2: baseline + 5, x1:x2], template, cv2.TM_CCOEFF)
-    res = np.asarray(res)
-
-    #+ve res are our interest so, search for first negative number
-    negNumbers = np.where(res < 0.0)
-
-    # if no negative numbers, it means it may be a single letter like (noon) and we don't segment
-    if (len(negNumbers[1]) == 0):
-        return segmented
-
-    # (pos of last positive = pos of first negative -1)
-    threshold = negNumbers[1][0] - 1
-
-    # if the first negative number is at pos 0 (last pos at -1), it means there are no descender chars, return
-    if threshold < 0:
-        return segmented
-
-    # PROBLEM HERE: problems occur here as some cases aren't supposed to be segmented, but they get to this point
-    # and are falsely segmented
-
-    # otherwise, there is a chance we have a desc char segmented at the following loc
-    loc = x1 + threshold + w -1
-
-    segmented = cv2.line(segmented, (loc, y1), (loc, y2), (255, 0, 0), 1)
-
-    # viewer = ImageViewer(segmented)
-    # viewer.show()
-
-    return segmented
-
-# the function works on the original image with the specified Xs and Ys
-# and return segmented image that contains the lines of different segmentation
-def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline):
-
-    # viewer = ImageViewer(img[y1:y2, x1:x2])
-    # viewer.show()
-
-    # get projection
-    horPro = np.sum(img[y1:y2, x1:x2], 0)
-
-    # get indices of non zeros (to be able to detect the start and end of word and ignore background)
-    # and return if all are zeros
-    indexOfNonZeros =  [i for i, e in enumerate(horPro) if e != 0]
-    if (len(indexOfNonZeros) == 0):
-        return segmented
-
-    # replace the two clusters of zeros on the 2 extremes(background) by -1 so that only zeros within the word is considered
-    horPro[0:indexOfNonZeros[0]] = -1
-    horPro[indexOfNonZeros[-1]:len(horPro)] = -1
-
-    # get the zeros within word
-    zeroCrossings = np.where(horPro== 0.0)
-
-    # if no zeros found, return
-    if (len(zeroCrossings[0])==0):
-        return segmented
-
-    # getting positions of lines accurately (similar to wordSegmentation function)
-    kde = KernelDensity().fit(zeroCrossings[0][:, None])
-
-    bins = np.linspace(0, img[y1:y2, x1:x2].shape[1], img[y1:y2, x1:x2].shape[1])
-
-    logProb = kde.score_samples(bins[:, None])
-
-    prob = np.exp(logProb)
-
-    maximasTest = argrelextrema(prob, np.greater)
-
-    # append 0 at the beginning for drawing
-    maximasTest2 = [0]
-
-    for i in range(len(maximasTest[0])):
-        maximasTest2.append(maximasTest[0][i])
-
-    #for drawing
-    maximasTest2.append(x2-x1)
-
-    # for each subword, get characters
-    for j in range(len(maximasTest2)-1):
-        # first step in getting characters is looping on each sub word and find descender characters and segment them
-        # currently commented as it's not very accurate
-        # descenderSegmentation(img, y1, y2, x1 + maximasTest2[j], x1+ maximasTest2[j+1], segmented, baseline)
-
-        segmented = cv2.line(segmented, (x1+ maximasTest2[j], y1), (x1 + maximasTest2[j], y2), (255, 0, 0), 1)
-
-        # viewer = ImageViewer(segmented)
-        # viewer.show()
-    return segmented
+    return filteredCuts
 
 # Function to segment the lines and words in these lines
 def wordSegmentation(image, lineBreaks, maximas):
     """
-
     :param image: binary image
     :param lineBreaks: line breaks array
     :return: words and lines segmented image
@@ -233,6 +224,15 @@ def wordSegmentation(image, lineBreaks, maximas):
 
     # el loop di betlef 3ala kol el line breaks fa betgib kol el lines
     for i in range(len(lineBreaks) - 1):
+        y1, y2 = lineBreaks[i], lineBreaks[i + 1]
+        maxTransitionsIndex, transPositions = getMaxTransitions(image, y1, maximas[0][i])
+
+        # segmented = cv2.line(segmented, (0, maxTransitionsIndex), (image.shape[1], maxTransitionsIndex), (255, 0, 0), 1)
+        # segmented = cv2.line(segmented, (0, maximas[0][i]), (image.shape[1], maximas[0][i]), (255, 0, 0), 1)
+        #
+        # for indx in range(len(transPositions)):
+        #     segmented = cv2.line(segmented, (transPositions[indx], y1), (transPositions[indx], y2), (255, 0, 0), 1)
+
 
         line = image.copy()
         # Segment each line in the image and create a new image for each line
@@ -241,14 +241,14 @@ def wordSegmentation(image, lineBreaks, maximas):
 
         # Hane3mel vertical projection 3adi ba3d
         # Keda hane3mel convolution 3ashan ne smooth el curve
-        window = [1, 1, 1, 1, 1]
         horPro = np.sum(line, 0)
-        ConvProj = np.convolve(horPro, window)
+
+        MFV = np.bincount(horPro[horPro != 0]).argmax()
 
         # Hanshouf fein amaken el zeros
         # El mafroud ba3d el smoothing yetla3li amaken el zeros
         # Ely bein el kalmat we ba3d 3ashan benhom masafa kebira
-        zeroCrossings = np.where(ConvProj == 0.0)
+        zeroCrossings = np.where(horPro == 0.0)
 
         # El array ely esmo zero crossing da beyeb2a gowah range el amaken ely fiha zeros ketyr
         # Momken law 3amalnalo clustering we gebna el mean beta3 kol cluster da yeb2a makan el 2at3 ely hanesta5demo
@@ -263,28 +263,18 @@ def wordSegmentation(image, lineBreaks, maximas):
         # Score samples di betala3 el probabilities beta3et el arkam ely 3amalnalha fit beteb2a log values
         logProb = kde.score_samples(bins[:, None])
         prob = np.exp(logProb)
-
         # Law gebna el maximas beta3et el prob array da hateb2a heya di amaken el at3 mazbouta inshallah
         maximasTest = argrelextrema(prob, np.greater)
 
-        top, bottom = lineBreaks[i], lineBreaks[i + 1]
-
-        # for each word in the current line
+        # for each sub word in the current line
         for j in range(len(maximasTest[0]) - 1):
-            # word = np.copy(line)
-            # word = word[:, maximasTest[0][j]: maximasTest[0][j+1]]
-            left, right = maximasTest[0][j], maximasTest[0][j + 1]
+            x1, x2 = maximasTest[0][j], maximasTest[0][j + 1]
+            currentTransPositions, cutPositions = getAllCutEdges(x1, x2, transPositions, horPro, MFV)
+            validCuts = getFilteredCutPoints(image, x1, x2, y1, y2, currentTransPositions, cutPositions, horPro, maximas[0][i])
 
-            # for each word, divide it into sub-words
-            segmented = subWordSegmentation(image, segmented, top, bottom, left, right, maximas[0][i])
+            for indx in range(len(validCuts)):
+                segmented = cv2.line(segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
 
-            segmented = cv2.rectangle(segmented, (left, top), (right, bottom), (255, 0, 0), 1)
-
-            # viewer = ImageViewer(segmented)
-            # viewer.show()
-
-
-        # if i == 0:
-        #     cv2.imwrite('Sultan.png', line[:, maximasTest[0][0]: maximasTest[0][1]])
+            segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
 
     return segmented
