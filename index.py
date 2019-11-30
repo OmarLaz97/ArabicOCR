@@ -16,14 +16,14 @@ viewer.show()
 angle = skewNormal(img)
 newImage = trans.rotate(img, angle, mode="edge")
 newImage = (newImage * 255).astype(np.uint8)
-viewer = ImageViewer(newImage)
-viewer.show()
+# viewer = ImageViewer(newImage)
+# viewer.show()
 
 # Transform to binary
 # Thresholding, the surrounding 5 pixels and 10 deducted from the threshold is the best till now
 newImage = cv2.adaptiveThreshold(newImage, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 5, 10)
-viewer = ImageViewer(newImage)
-viewer.show()
+# viewer = ImageViewer(newImage)
+# viewer.show()
 
 # TODO: EL morphological operations lessa masta5demnahash + enena lessa ma3amlnash noise reduction
 # window = selem.rectangle(2, 1)
@@ -32,17 +32,17 @@ viewer.show()
 # viewer.show()
 
 # Skeletonize the image to get the minimum possible data to work with
-newImage = (newImage / 255).astype(np.uint8)
-newImage = skeletonize(newImage)
-viewer = ImageViewer(newImage)
-viewer.show()
-newImage = (newImage * 255).astype(np.uint8)
+# newImage = (newImage / 255).astype(np.uint8)
+# newImage = skeletonize(newImage)
+# viewer = ImageViewer(newImage)
+# viewer.show()
+# newImage = (newImage * 255).astype(np.uint8)
 
 # Get the Baseline of the image
 # baselinedImage,
 baselinedImage, maximas = Baseline(newImage)
-viewer = ImageViewer(baselinedImage)
-viewer.show()
+# viewer = ImageViewer(baselinedImage)
+# viewer.show()
 
 # Get the line breaks of the image from the maximas array
 lineBreakedImg, lineBreaks = getLineBreaks(newImage, maximas)
