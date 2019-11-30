@@ -211,6 +211,7 @@ def getFilteredCutPoints(image, x1, x2, y1, y2, currentTransPositions, cutPositi
         #     filteredCuts.append(cutIndex)
         #     continue
 
+
     return filteredCuts
 
 # Function to segment the lines and words in these lines
@@ -272,8 +273,8 @@ def wordSegmentation(image, lineBreaks, maximas):
             currentTransPositions, cutPositions = getAllCutEdges(x1, x2, transPositions, horPro, MFV)
             validCuts = getFilteredCutPoints(image, x1, x2, y1, y2, currentTransPositions, cutPositions, horPro, maximas[0][i])
 
-            for indx in range(len(validCuts)):
-                segmented = cv2.line(segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
+            for indx in range(len(cutPositions)):
+                segmented = cv2.line(segmented, (cutPositions[indx], y1), (cutPositions[indx], y2), (255, 0, 0), 1)
 
             segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
 
