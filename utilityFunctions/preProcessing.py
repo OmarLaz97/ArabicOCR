@@ -4,7 +4,28 @@ import skimage.transform as trans
 from scipy.signal import argrelextrema
 from skimage.viewer import ImageViewer
 from sklearn.neighbors import KernelDensity
-import skimage.graph
+from skimage.graph import route_through_array
+
+# rotation maram
+def getRotatedImg(img):
+    thresh = img.copy()
+    thresh = 1 - (thresh / 255)
+
+    coords = np.column_stack(np.where(thresh > 0))
+
+    angle = cv2.minAreaRect(coords)[-1]
+    if angle < -45:
+        angle = -(90 + angle)
+    else:
+        angle = -angle
+
+    (h, w) = img.shape[:2]
+    center = (w // 2, h // 2)
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    rotated = cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    rotated = 1 - (rotated / 255)
+    return angle
+
 
 # function to get fix a rotated image and get the baseline
 def skewNormal(image):
@@ -67,6 +88,7 @@ def skewNormal(image):
 
     return angle
 
+
 # Draw The Baselines over the image
 def Baseline(image):
     """
@@ -80,9 +102,11 @@ def Baseline(image):
 
     baseLinedImage = image.copy()
     for i in range(len(maximas[0])):
-        baseLinedImage = cv2.line(baseLinedImage, (0, maximas[0][i]), (baseLinedImage.shape[1], maximas[0][i]), (255, 0, 0), 1)
+        baseLinedImage = cv2.line(baseLinedImage, (0, maximas[0][i]), (baseLinedImage.shape[1], maximas[0][i]),
+                                  (255, 0, 0), 1)
 
     return baseLinedImage, maximas
+
 
 # Function to get where each line ends and save the row values in an array for further line segmentation
 def getLineBreaks(image, maximas):
@@ -109,57 +133,87 @@ def getLineBreaks(image, maximas):
 
     return img, lineBreaks
 
-def getMaxTransitions(image, y1, baslineIndex):
+
+# Function to get max tranisition index in each line
+# It takes the line represented by image, the upper bound of line y1 and baseline (the middle of line)
+def getMaxTransitionsIndex(image, y1, baslineIndex):
     maxTransitions = 0
-    transPositions = []
-    maxTransitionsIndex = baslineIndex
+    maxTransitionsIndex = baslineIndex #initialize max transition index by baseline
     i = baslineIndex
+
+    #loop from baseline to upper bound y1 to get the currentTransitions and return the index having max transitions
     while i > y1:
         currentTransitions = 0
-        currentTransPositions = []
-        flag = image[i][0]  #is always zero as beg of line is background
+        flag = image[i][0]  # is always zero as beg of line is background
         j = 1
         while j < image.shape[1]:
             if image[i][j] == 255 and flag == 0:
-                currentTransPositions.append(j)
                 currentTransitions += 1
                 flag = 1
-            elif image[i][j] == 0 and flag ==1:
-                currentTransPositions.append(j)
+            elif image[i][j] == 0 and flag == 1:
                 flag = 0
-            j+=1
+
+            j += 1
 
         if currentTransitions >= maxTransitions:
             maxTransitions = currentTransitions
-            transPositions = currentTransPositions
             maxTransitionsIndex = i
 
         i -= 1
 
-    transPositions = transPositions[1:len(transPositions) - 1]
-    return maxTransitionsIndex, transPositions
+    return maxTransitionsIndex
 
-def getAllCutEdges(x1, x2, transPositions, projections, MFV):
-    cutPositions = []
+# get transitions on max transition index in current sub word given its dimentions (x1, x2)
+def getTransInSubWord(image, x1, x2, maxTransIndex):
+    currentTransPositions = []
+    flag = image[maxTransIndex][x1]  # is always zero as beg of line is background
+    j = x1 + 1
+    while j <= x2:
+        if image[maxTransIndex][j] == 255 and flag == 0:
+            currentTransPositions.append(j)
+            flag = 1
+        elif image[maxTransIndex][j] == 0 and flag == 1:
+            currentTransPositions.append(j - 1)
+            flag = 0
 
-    currentTransPositions = [i for i in transPositions if i > x1 and i < x2]
+        j += 1
+
+    # currentTransPositions contains all x values of transitions (always a black pixel)
+
+    # chop first and last element as they represent the boundaries of word (already cutted)
+    currentTransPositions = currentTransPositions[1:-1]
+
+    # Invert the array so that it would be in descending order, i.e. from right to left of the image
     currentTransPositions = currentTransPositions[::-1]
+    return currentTransPositions
+
+
+# given the transPositions of the current sub word, the vertical projections (onn x-axis) of the pixels within the line which contains the sub word
+# and Most Frequent Value (MFV) which represents the width of the baseline
+# return array represeting all possible cut positions between each 2 consecutive transition point
+def getCutEdgesInSubWord(currentTransPositions, projections, MFV):
+    cutPositions = []
 
     if len(currentTransPositions) <= 1:
         return currentTransPositions, cutPositions
 
-    for i in range(0, len(currentTransPositions) -1, 2):
+    # get two consecutive transition points to represent start and end index
+    for i in range(0, len(currentTransPositions) - 1, 2):
         startIndex = currentTransPositions[i]
-        if i+1 >= len(currentTransPositions):
+        if i + 1 >= len(currentTransPositions):
             break
-        endIndex = currentTransPositions[i+1]
+        endIndex = currentTransPositions[i + 1]
 
-        middleIndex = int((startIndex + endIndex)/2)
+        middleIndex = int((startIndex + endIndex) / 2)
 
+        # if the projection at the middle index is zero or equal to the baseline width, it's valid
+        # -> append middle index and continue to test next 2 trans points to get the cut index
         if projections[middleIndex] == 0.0 or projections[middleIndex] == MFV:
             cutPositions.append(middleIndex)
             continue
 
+        # otherwise, loop from middle to the end index
+        # i.e from middle to left to find if any projection satisfy the previous conditions
         found = False
         k = middleIndex - 1
         while k >= endIndex:
@@ -167,10 +221,12 @@ def getAllCutEdges(x1, x2, transPositions, projections, MFV):
                 found = True
                 cutPositions.append(k)
                 break
-            k-=1
+            k -= 1
 
+        # if found, then the cut index is already appended, then continue
         if found:
             continue
+        # otherwise, loop from middle to start (from middle to right)
         else:
             k = middleIndex + 1
             while k <= startIndex:
@@ -178,41 +234,71 @@ def getAllCutEdges(x1, x2, transPositions, projections, MFV):
                     found = True
                     cutPositions.append(k)
                     break
-                k+=1
+                k += 1
 
             if found:
                 continue
             else:
+                # if not found, then append middle index anyway
                 cutPositions.append(middleIndex)
 
-    return currentTransPositions, cutPositions
+    return cutPositions
 
-def getFilteredCutPoints(image, x1, x2, y1, y2, currentTransPositions, cutPositions, projections, baseline):
-    # viewer = ImageViewer(image[y1:y2, x1:x2])
-    # viewer.show()
+#  given all possible cuts within a sub-word, return only valid ones
+def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, projections, baseline, maxTransIndex):
     filteredCuts = []
-    # for each region
+
+    # get array of costs for the path finding
+    T, F = True, False
+    path = image.copy()
+    path = np.where(path == 255, T, path)
+    path = np.where(path == 0, F, path)
+    costs = np.where(path, 1, 1000)
+
     cut = 0
-    for i in range(0, len(currentTransPositions) -1, 2):
+    for i in range(0, len(currentTransPositions) - 1, 2):
         startIndex = currentTransPositions[i]
-        endIndex = currentTransPositions[i+1]
+        endIndex = currentTransPositions[i + 1]
 
         cutIndex = cutPositions[cut]
-        cut +=1
+        cut += 1
 
+        # CASE 1: (handling reh and zein in the middle of the sub-word) check if no path -> valid
         # the separation region is valid if there is no connected path between the start and the end index of a current region
-        # path = False
-        # for k in range(endIndex, startIndex):
-        #     if image[baseline][k] != 0:
-        #         path = True
-        #         break
-        #
-        # if not path:
-        #     filteredCuts.append(cutIndex)
-        #     continue
+        path, cost = route_through_array(costs, start=(maxTransIndex, startIndex), end=(maxTransIndex, endIndex), fully_connected=True)
 
+        passExists = True
+        for item in path:
+            if image[item[0], item[1]] == 0:
+                passExists = False
+                break
+
+        if not passExists:
+            filteredCuts.append(cutIndex)
+            continue
+
+        # CASE 2 if holes found, ignore cut edge
+        # TODO get function that detected a hole, if hole found ignore edge(continue to inspect next edge)
+
+        # CASE3: seen, sheen, sad, dad, qaf, noon at the end of sub-word handling:
+        # ignore edge in the middle of the curve of these characters
+        baselineExistance = False
+        for k in range(endIndex + 1, startIndex):
+            if image[baseline, k] == 255:
+                baselineExistance = True
+                break
+
+        sumBelowBaseline = np.sum(np.sum(image[baseline + 1:y2, endIndex + 1:startIndex], 1))
+        sumAboveBaseline = np.sum(np.sum(image[y1:baseline, endIndex + 1:startIndex], 1))
+
+        if not baselineExistance and sumBelowBaseline > sumAboveBaseline:  # invalid
+            # since edge is not valid we continue without appending it
+            # the following line appeds the invalid index just for debugging
+            # filteredCuts.append(cutIndex)
+            continue
 
     return filteredCuts
+
 
 # Function to segment the lines and words in these lines
 def wordSegmentation(image, lineBreaks, maximas):
@@ -226,14 +312,13 @@ def wordSegmentation(image, lineBreaks, maximas):
     # el loop di betlef 3ala kol el line breaks fa betgib kol el lines
     for i in range(len(lineBreaks) - 1):
         y1, y2 = lineBreaks[i], lineBreaks[i + 1]
-        maxTransitionsIndex, transPositions = getMaxTransitions(image, y1, maximas[0][i])
+        maxTransitionsIndex = getMaxTransitionsIndex(image, y1, maximas[0][i])
 
         # segmented = cv2.line(segmented, (0, maxTransitionsIndex), (image.shape[1], maxTransitionsIndex), (255, 0, 0), 1)
         # segmented = cv2.line(segmented, (0, maximas[0][i]), (image.shape[1], maximas[0][i]), (255, 0, 0), 1)
         #
         # for indx in range(len(transPositions)):
         #     segmented = cv2.line(segmented, (transPositions[indx], y1), (transPositions[indx], y2), (255, 0, 0), 1)
-
 
         line = image.copy()
         # Segment each line in the image and create a new image for each line
@@ -244,6 +329,7 @@ def wordSegmentation(image, lineBreaks, maximas):
         # Keda hane3mel convolution 3ashan ne smooth el curve
         horPro = np.sum(line, 0)
 
+        # Most frequent value (MFV), which represents the width of the baseline
         MFV = np.bincount(horPro[horPro != 0]).argmax()
 
         # Hanshouf fein amaken el zeros
@@ -270,12 +356,15 @@ def wordSegmentation(image, lineBreaks, maximas):
         # for each sub word in the current line
         for j in range(len(maximasTest[0]) - 1):
             x1, x2 = maximasTest[0][j], maximasTest[0][j + 1]
-            currentTransPositions, cutPositions = getAllCutEdges(x1, x2, transPositions, horPro, MFV)
-            validCuts = getFilteredCutPoints(image, x1, x2, y1, y2, currentTransPositions, cutPositions, horPro, maximas[0][i])
+            currentTransPositions = getTransInSubWord(image, x1, x2, maxTransitionsIndex)
+            currentCutPositions = getCutEdgesInSubWord(currentTransPositions, horPro, MFV)
 
-            for indx in range(len(cutPositions)):
-                segmented = cv2.line(segmented, (cutPositions[indx], y1), (cutPositions[indx], y2), (255, 0, 0), 1)
+            validCuts = getFilteredCutPoints(image, y1, y2, currentTransPositions, currentCutPositions, horPro,
+                                             maximas[0][i], maxTransitionsIndex)
 
-            segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
+            for indx in range(len(validCuts)):
+                segmented = cv2.line(segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
+
+            # segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
 
     return segmented
