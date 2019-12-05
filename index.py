@@ -13,20 +13,21 @@ viewer.show()
 
 # Skew Correction
 # Getting first the right angle of rotation, then rotating the original image
-angle = skewNormal(img)
-newImage = trans.rotate(img, angle, mode="edge")
-newImage = (newImage * 255).astype(np.uint8)
+# angle = skewNormal(img)
+# newImage = trans.rotate(img, angle, mode="edge")
+# newImage = (newImage * 255).astype(np.uint8)
 # viewer = ImageViewer(newImage)
 # viewer.show()
 
 # rotation maram
-# angle = getRotatedImg(img)
-# newImage = trans.rotate(img, angle, mode="edge")
-# newImage = (newImage * 255).astype(np.uint8)
+angle = getRotatedImg(img)
+newImage = trans.rotate(img, angle, mode="edge")
+newImage = (newImage * 255).astype(np.uint8)
 
 # Transform to binary
 # Thresholding, the surrounding 5 pixels and 10 deducted from the threshold is the best till now
-newImage = cv2.adaptiveThreshold(newImage, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 5, 15)
+# newImage = cv2.adaptiveThreshold(newImage, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 9, 40)
+newImage = cv2.adaptiveThreshold(newImage, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 5, 20)
 # if using rotation maram
 # newImage = cv2.adaptiveThreshold(newImage, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 3, 21)
 # viewer = ImageViewer(newImage)
@@ -43,6 +44,7 @@ newImage = cv2.adaptiveThreshold(newImage, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.
 # newImage = skeletonize(newImage)
 # viewer = ImageViewer(newImage)
 # viewer.show()
+# newImage = (newImage * 255).astype(np.uint8)
 
 # Get the Baseline of the image
 # baselinedImage,
