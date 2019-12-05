@@ -263,6 +263,9 @@ def isSegmentStroke():
 def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, projections, baseline, maxTransIndex, MFV, lineHeight, segmented):
     filteredCuts = []
 
+    if len(currentTransPositions) < 1:
+        return segmented, filteredCuts
+
     # get array of costs for the path finding
     T, F = True, False
     path = image.copy()
@@ -287,6 +290,9 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
         path, cost = route_through_array(costs, start=(maxTransIndex, startIndex), end=(maxTransIndex, endIndex), fully_connected=True)
         if cost >= 1000:  # no path found, APPEND
             # filteredCuts.append(cutIndex)
+            currentTransPositions[i] = -1
+            currentTransPositions[i + 1] = -1
+            cutPositions[cut-1] = -1
             continue
 
         # ############################################ END OF CASE 1 ##################################################
@@ -313,6 +319,9 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
             # since edge is not valid we continue without appending it
             # the following line appends the invalid index just for debugging
             # filteredCuts.append(cutIndex)
+            currentTransPositions[i] = -1
+            currentTransPositions[i + 1] = -1
+            cutPositions[cut-1] = -1
             continue
 
         # ############################################ END OF CASE 3 ##################################################
@@ -337,26 +346,13 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
         doubleCheckLastRegion = min(projections[endIndex], projections[endIndex-1], projections[endIndex-2], projections[endIndex-3])
         if cut >= len(cutPositions) and doubleCheckLastRegion == 0 and topLeftHeight < 0.5*lineHeight:
             # filteredCuts.append(cutIndex)
+            currentTransPositions[i] = -1
+            currentTransPositions[i + 1] = -1
+            cutPositions[cut-1] = -1
             continue
 
         # ############################################ END OF CASE 5 ##################################################
 
-        # STROKES and NO STROKES 
-        # detecting stroke, should be placed in a function to be called for several characters at the same time
-        if cut < len(cutPositions):  # if there is a next region
-            newStartIndex = cutIndex
-            newEndIndex = cutPositions[cut]
-
-            maxHeightPos = np.where(image[y1:baseline, newEndIndex:newStartIndex] > 0)
-            maxHeightPos = min(maxHeightPos[0]) + y1
-            midHeightPos = int((y1 + baseline) /2)
-
-            newSumBelowBaseline = np.sum(np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex], 1))
-            newSumAboveBaseline = np.sum(np.sum(image[y1:baseline, newEndIndex + 1:newStartIndex], 1))
-
-            if newSumAboveBaseline > newSumBelowBaseline and maxHeightPos < baseline and maxHeightPos > midHeightPos and projections[cutIndex] <= MFV:
-                segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
-                print("stroke found")
 
         #
         # STROKES and NO STROKES cases ALGORITHM
@@ -391,6 +387,41 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
         #
         #         # if SEGN not stroke or stroke with dots then ignore
 
+    if max(currentTransPositions) == -1: # all transitions is categorized as valid or invalid
+        return segmented, filteredCuts
+
+    cut = 0
+    for i in range(0, len(currentTransPositions) - 1, 2):
+        startIndex = currentTransPositions[i]
+        endIndex = currentTransPositions[i + 1]
+
+        cutIndex = cutPositions[cut]
+        cut += 1
+
+        if cutIndex == -1:
+            continue
+
+        # STROKES and NO STROKES
+        # detecting stroke, should be placed in a function to be called for several characters at the same time
+        if cut < len(cutPositions):  # if there is a next region
+            newStartIndex = cutIndex
+            newEndIndex = cutPositions[cut]
+
+            if newEndIndex == -1:  # if next cut is already categorized
+                continue
+
+            maxHeightPos = np.where(image[y1:baseline, newEndIndex:newStartIndex] > 0)
+
+            maxHeightPos = min(maxHeightPos[0]) + y1
+            midHeightPos = int((y1 + baseline) / 2)
+
+            newSumBelowBaseline = np.sum(np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex], 1))
+            newSumAboveBaseline = np.sum(np.sum(image[y1:baseline, newEndIndex + 1:newStartIndex], 1))
+
+            if newSumAboveBaseline > newSumBelowBaseline and maxHeightPos < baseline and maxHeightPos > midHeightPos and \
+                    projections[cutIndex] <= MFV:
+                segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
+                print("stroke found")
 
     return segmented, filteredCuts
 
