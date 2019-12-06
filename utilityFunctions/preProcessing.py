@@ -221,7 +221,7 @@ def getCutEdgesInSubWord(currentTransPositions, projections, MFV):
 
         # if the projection at the middle index is zero or equal to the baseline width, it's valid
         # -> append middle index and continue to test next 2 trans points to get the cut index
-        if projections[middleIndex] == 0.0 or projections[middleIndex] == MFV:
+        if projections[middleIndex] == 0.0 or projections[middleIndex] <= MFV:
             cutPositions.append(middleIndex)
             continue
 
@@ -293,8 +293,6 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
         path, cost = route_through_array(costs, start=(maxTransIndex, startIndex), end=(maxTransIndex, endIndex), fully_connected=True)
         if cost >= 1000:  # no path found, APPEND
             filteredCuts.append(cutIndex)
-            currentTransPositions[i] = -1
-            currentTransPositions[i + 1] = -1
             cutPositions[cut-1] = -1
             continue
 
@@ -320,9 +318,7 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
             if cost < 2000:  # path found --> loop, IGNORE
                 # filteredCuts.append(cutIndex)
-                currentTransPositions[i] = -1
-                currentTransPositions[i + 1] = -1
-                cutPositions[cut - 1] = -1
+                cutPositions[cut-1] = -2
                 continue
         # ############################################ END OF CASE 2 ##################################################
 
@@ -342,8 +338,6 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
             # since edge is not valid we continue without appending it
             # the following line appends the invalid index just for debugging
             # filteredCuts.append(cutIndex)
-            currentTransPositions[i] = -1
-            currentTransPositions[i + 1] = -1
             cutPositions[cut-1] = -1
             continue
 
@@ -369,28 +363,23 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
         doubleCheckLastRegion = min(projections[endIndex], projections[endIndex-1], projections[endIndex-2], projections[endIndex-3])
         if cut >= len(cutPositions) and doubleCheckLastRegion == 0 and topLeftHeight < 0.5*lineHeight:
             # filteredCuts.append(cutIndex)
-            currentTransPositions[i] = -1
-            currentTransPositions[i + 1] = -1
             cutPositions[cut-1] = -1
             continue
 
         # ############################################ END OF CASE 5 ##################################################
 
 
-    if max(currentTransPositions) == -1: # all transitions is categorized as valid or invalid
+    if len(cutPositions) >0 and max(cutPositions) == -1: # all transitions is categorized as valid or invalid
         return segmented, filteredCuts
 
     strokes = []
     dots = []
     cut = 0
-    for i in range(0, len(currentTransPositions) - 1, 2):
-        startIndex = currentTransPositions[i]
-        endIndex = currentTransPositions[i + 1]
-
+    for i in range(0, len(cutPositions) - 1):
         cutIndex = cutPositions[cut]
         cut += 1
 
-        if cutIndex == -1:
+        if cutIndex == -1 or cutIndex == -2:
             continue
 
         # STROKES and NO STROKES
@@ -399,7 +388,16 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
             newStartIndex = cutIndex
             newEndIndex = cutPositions[cut]
 
+            loopFound = False
+
             if newEndIndex == -1:  # if next cut is already categorized
+                continue
+            elif newEndIndex == -2 and cut + 1 < len(cutPositions):
+                if cutPositions[cut + 1] < 0:
+                    continue
+                newEndIndex = cutPositions[cut + 1]
+                loopFound = True
+            elif newEndIndex == -2 and cut + 1 >= len(cutPositions):
                 continue
 
             midHeightPos = int((y1 + baseline) / 2)
@@ -414,8 +412,9 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
             maxHeightPos = y1 + lastZero + 1
 
+
             if newSumAboveBaseline > newSumBelowBaseline and maxHeightPos < baseline and maxHeightPos > midHeightPos and \
-                    projections[cutIndex] <= (MFV +255):
+                    projections[cutIndex] <= (MFV +255) and not loopFound:
                 # segment is a stroke
                 # segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
                 strokes.append(newStartIndex)
@@ -566,8 +565,8 @@ def wordSegmentation(image, lineBreaks, maximas):
         # for each sub word in the current line
         for j in range(len(maximasTest[0]) - 1):
             x1, x2 = maximasTest[0][j], maximasTest[0][j + 1]
-            if i== 8:
-                print("Ho")
+            if i == 0 and x2 > 130:
+                print("test")
             currentTransPositions = getTransInSubWord(image, x1, x2, maxTransitionsIndex)
             currentCutPositions = getCutEdgesInSubWord(currentTransPositions, horPro, MFV)
 
