@@ -2,9 +2,10 @@ import cv2
 import numpy as np
 import skimage.transform as trans
 from scipy.signal import argrelextrema
+from skimage.graph import route_through_array
 from skimage.viewer import ImageViewer
 from sklearn.neighbors import KernelDensity
-from skimage.graph import route_through_array
+
 
 # rotation maram
 def getRotatedImg(img):
@@ -269,6 +270,8 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
     # get array of costs for the path finding
     T, F = True, False
     path = image.copy()
+    viewer = ImageViewer(segmented)
+    viewer.show()
     path = np.where(path == 255, T, path)
     path = np.where(path == 0, F, path)
     costs = np.where(path, 1, 1000)
@@ -300,7 +303,57 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
         # CASE 2 if holes found, ignore cut edge
         # Algorithm: if SEGP has a hole then ignore
         # TODO get function that detected a hole, if hole found ignore edge(continue to inspect next edge)
+        reg = image[y1:y2, endIndex - 2:startIndex + 2]
+        # viewer = ImageViewer(reg)
+        # viewer.show()
+        reg = reg.copy()
 
+        container = np.zeros((reg.shape[0], reg.shape[1] + 6))
+        container[:, 3:(container.shape[1] - 3)] = reg
+        # cv2.imshow("Image", container)
+        # cv2.waitKey(0)
+
+        container = container.copy()
+
+        # shapeMask = cv2.inRange(reg, lower, upper)
+        shapeMask = (container.copy()).astype("uint8")
+        shapeMask[shapeMask > 0] = 4
+        shapeMask[shapeMask == 0] = 255
+        shapeMask[shapeMask == 4] = 0
+
+        _, cnts, h = cv2.findContours(shapeMask, cv2.RETR_CCOMP,
+                                      cv2.CHAIN_APPROX_SIMPLE)
+
+        mask = np.zeros((shapeMask.shape[0], shapeMask.shape[1]))
+
+        # loop over the contours
+        k = 0
+        for c in cnts:
+            # draw the contour and show it
+            cv2.drawContours(mask, [c], -1, 255, -1)
+            # cv2.imshow("Image", mask)
+            # cv2.waitKey(0)
+            pos = np.where(mask == 255)
+
+            black = 0
+            white = 0
+            print(h[0][k][0])
+
+            if h[0][k][0] > 0:
+                for m in range(len(pos[0])):
+                    for _ in range(len(pos[1])):
+                        if shapeMask[pos[0][m]][pos[1][m]] == 255:
+                            white += 1
+                        else:
+                            black += 1
+
+            if 2 * black < white:
+                cv2.drawContours(reg, [c], -1, 255, -1)
+                # cv2.imshow("Image", reg)
+                # cv2.waitKey(0)
+
+            mask = np.zeros((shapeMask.shape[0], shapeMask.shape[1]))
+            k += 1
         # ############################################ END OF CASE 2 ##################################################
 
         # CASE3: seen, sheen, sad, dad, qaf, noon at the end of sub-word handling:
