@@ -230,7 +230,7 @@ def getCutEdgesInSubWord(currentTransPositions, projections, MFV):
         found = False
         k = middleIndex - 1
         while k >= endIndex:
-            if projections[middleIndex] == 0.0 or projections[middleIndex] == MFV:
+            if projections[k] == 0.0 or projections[k] <= MFV:
                 found = True
                 cutPositions.append(k)
                 break
@@ -243,7 +243,7 @@ def getCutEdgesInSubWord(currentTransPositions, projections, MFV):
         else:
             k = middleIndex + 1
             while k <= startIndex:
-                if projections[middleIndex] == 0.0 or projections[middleIndex] == MFV:
+                if projections[k] == 0.0 or projections[k] <= MFV:
                     found = True
                     cutPositions.append(k)
                     break
@@ -261,7 +261,7 @@ def isSegmentStroke():
     return True
 
 #  given all possible cuts within a sub-word, return only valid ones
-def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, projections, baseline, maxTransIndex, MFV, lineHeight, segmented):
+def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions, projections, baseline, maxTransIndex, MFV, lineHeight, segmented):
     filteredCuts = []
 
     if len(currentTransPositions) < 1:
@@ -292,7 +292,7 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
 
         path, cost = route_through_array(costs, start=(maxTransIndex, startIndex), end=(maxTransIndex, endIndex), fully_connected=True)
         if cost >= 1000:  # no path found, APPEND
-            # filteredCuts.append(cutIndex)
+            filteredCuts.append(cutIndex)
             currentTransPositions[i] = -1
             currentTransPositions[i + 1] = -1
             cutPositions[cut-1] = -1
@@ -301,7 +301,7 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
         # ############################################ END OF CASE 1 ##################################################
 
         # CASE 2 if holes found, ignore cut edge
-        # Algorithm: if SEGP has a hole then ignore
+        # Algorithm: if SEGP has a hole then IGNORE
         p = costs[y1:maxTransIndex + 1, endIndex - 1:startIndex + 2]
         xx1 = 0 + 1
         xx2 = p.shape[1] - 2
@@ -319,7 +319,7 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
                                              fully_connected=True)
 
             if cost < 2000:  # path found --> loop, IGNORE
-                filteredCuts.append(cutIndex)
+                # filteredCuts.append(cutIndex)
                 currentTransPositions[i] = -1
                 currentTransPositions[i + 1] = -1
                 cutPositions[cut - 1] = -1
@@ -377,42 +377,11 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
         # ############################################ END OF CASE 5 ##################################################
 
 
-        #
-        # STROKES and NO STROKES cases ALGORITHM
-        # if isSegmentStroke() == False:
-        # Algorithm: if no baseline between start and end indices of next region
-        # and cut index of next region is <= MFV, then ignore
-
-        #     if cut < len(cutPositions): # if there is a next region
-        #         startNext = currentTransPositions[i +2]
-        #         endNext = currentTransPositions[i + 3]
-        #         cutNext = cutPositions[cut]
-        #         baselineExistance = False
-        #         for k in range(endNext + 1, startNext):
-        #             if image[baseline, k] == 255:
-        #                 baselineExistance = True
-        #                 break
-        #
-        #         if not baselineExistance and (cutNext <= MFV):
-        #             continue
-        #         else:
-        #             filteredCuts.append(cutIndex)
-        #             continue
-        #
-        # else: #segment is stroke
-        #     print("segment is stroke")
-        #     # if segment has dots below or above, append
-        #
-        #     # else if no dots
-        #         # if SEGN is stroke without dots, append and icrement by 3 instead of 1
-        #
-        #         # if SEGN stroke with dots and SEGNN without dots, append and inc by 3
-        #
-        #         # if SEGN not stroke or stroke with dots then ignore
-
     if max(currentTransPositions) == -1: # all transitions is categorized as valid or invalid
         return segmented, filteredCuts
 
+    strokes = []
+    dots = []
     cut = 0
     for i in range(0, len(currentTransPositions) - 1, 2):
         startIndex = currentTransPositions[i]
@@ -447,11 +416,92 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
 
             if newSumAboveBaseline > newSumBelowBaseline and maxHeightPos < baseline and maxHeightPos > midHeightPos and \
                     projections[cutIndex] <= (MFV +255):
+                # segment is a stroke
                 # segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
-                print("stroke found")
+                strokes.append(newStartIndex)
+                strokes.append(newEndIndex)
+
+                dotsBelow = np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex], 1)
+                firstZero = np.where(dotsBelow == 0)[0][0]
+                dotsBelow = np.sum(dotsBelow[firstZero:])
+
+                dotsAbove = np.sum(image[y1:baseline, newEndIndex + 1:newStartIndex], 1)
+                lastZero = np.where(dotsAbove == 0)[0][-1]
+                dotsAbove = np.sum(dotsAbove[:lastZero])
+
+                if dotsBelow == 0 and dotsAbove == 0:
+                    dots.append(0)
+                elif dotsAbove > 0 and dotsAbove > dotsBelow:
+                    dots.append(1)
+                elif dotsBelow > 0 and dotsBelow > dotsAbove:
+                    dots.append(-1)
+
+                continue
+
             else:
+                # segment is not a stroke, valid -> APPEND the 2 cuts and continue
+
+                filteredCuts.append(newStartIndex)
+                filteredCuts.append(newEndIndex)
                 # segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
-                print("not-stroke found")
+                continue
+
+    if len(strokes) > 0 and len(cutPositions) > 0 and strokes[0] == cutPositions[0]:
+        # there is a probability of the existence of seen or sheen at the beg of sub-word
+        newStart = x2 +1
+        newEnd = cutPositions[0]
+
+        newSumBelowBaseline = np.sum(image[baseline + 1:y2, newEnd + 1:newStart], 1)
+        firstZero = np.where(newSumBelowBaseline == 0)[0][0]
+        newSumBelowBaseline = np.sum(newSumBelowBaseline[0:firstZero])
+
+        newSumAboveBaseline = np.sum(image[y1:baseline, newEnd + 1:newStart], 1)
+        lastZero = np.where(newSumAboveBaseline == 0)[0][-1]
+        newSumAboveBaseline = np.sum(newSumAboveBaseline[lastZero:])
+
+        maxHeightPos = y1 + lastZero + 1
+
+        dotsBelow = np.sum(image[baseline + 1:y2, newEnd + 1:newStart], 1)
+        firstZero = np.where(dotsBelow == 0)[0][0]
+        dotsBelow = np.sum(dotsBelow[firstZero:])
+
+        dotsAbove = np.sum(image[y1:baseline, newEnd + 1:newStart], 1)
+        lastZero = np.where(dotsAbove == 0)[0][-1]
+        dotsAbove = np.sum(dotsAbove[:lastZero])
+
+        if newSumAboveBaseline > newSumBelowBaseline and maxHeightPos < baseline and maxHeightPos > midHeightPos  \
+                and dotsAbove == 0 and dotsBelow == 0:
+            strokes = [newStart, newEnd] + strokes
+            dots = [0] + dots
+
+    i = 0
+    while i < len(strokes):
+        newStartIndex = strokes[i]
+        newEndIndex = strokes[i+1]
+
+        # if segment has dots below or above, APPEND
+        if dots[int(i/2)] != 0:
+            # segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
+            filteredCuts.append(newStartIndex)
+            filteredCuts.append(newEndIndex)
+            i += 2
+            continue
+        # if SEGN is stroke without dots, APPEND and icrement by 3 instead of 1 (SEEN DETECTED)
+        elif i+2 < len(strokes) and strokes[i+2] == strokes[i+1] and dots[int((i+2)/2)] == 0:
+            filteredCuts.append(newStartIndex)
+            if i+4 < len(strokes):
+                filteredCuts.append(strokes[i+5])
+            i += 6
+            continue
+        # if SEGN stroke with dots and SEGNN without dots, APPEND and inc by 3 (SHEEN)
+        elif i+2 < len(strokes) and strokes[i+2] == strokes[i+1] and dots[int((i+2)/2)] == 1 and i + 4 < len(strokes) and strokes [i+4] == strokes[i+3] and dots[int((i+4)/2)] == 0:
+            filteredCuts.append(newStartIndex)
+            filteredCuts.append(strokes[i+5])
+            i+= 6
+            continue
+
+        i += 2
+
 
     return segmented, filteredCuts
 
@@ -516,18 +566,18 @@ def wordSegmentation(image, lineBreaks, maximas):
         # for each sub word in the current line
         for j in range(len(maximasTest[0]) - 1):
             x1, x2 = maximasTest[0][j], maximasTest[0][j + 1]
-            if i== 7:
+            if i== 8:
                 print("Ho")
             currentTransPositions = getTransInSubWord(image, x1, x2, maxTransitionsIndex)
             currentCutPositions = getCutEdgesInSubWord(currentTransPositions, horPro, MFV)
 
             # validCuts = getFilteredCutPoints(image, y1, y2, currentTransPositions, currentCutPositions, horPro, maximas[0][i], maxTransitionsIndex, MFV, lineHeight, segmented)
-            segmented, validCuts = getFilteredCutPoints(image, y1, y2, currentTransPositions, currentCutPositions, horPro, maximas[0][i], maxTransitionsIndex, MFV, lineHeight, segmented)
+            segmented, validCuts = getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, currentCutPositions, horPro, maximas[0][i], maxTransitionsIndex, MFV, lineHeight, segmented)
 
 
             for indx in range(len(validCuts)):
                  segmented = cv2.line(segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
 
-            # segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
+            segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
 
     return segmented
