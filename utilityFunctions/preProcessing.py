@@ -270,8 +270,8 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
     # get array of costs for the path finding
     T, F = True, False
     path = image.copy()
-    viewer = ImageViewer(segmented)
-    viewer.show()
+    # viewer = ImageViewer(segmented)
+    # viewer.show()
     path = np.where(path == 255, T, path)
     path = np.where(path == 0, F, path)
     costs = np.where(path, 1, 1000)
@@ -302,58 +302,28 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
 
         # CASE 2 if holes found, ignore cut edge
         # Algorithm: if SEGP has a hole then ignore
-        # TODO get function that detected a hole, if hole found ignore edge(continue to inspect next edge)
-        reg = image[y1:y2, endIndex - 2:startIndex + 2]
-        # viewer = ImageViewer(reg)
-        # viewer.show()
-        reg = reg.copy()
+        p = costs[y1:maxTransIndex + 1, endIndex - 1:startIndex + 2]
+        xx1 = 0 + 1
+        xx2 = p.shape[1] - 2
 
-        container = np.zeros((reg.shape[0], reg.shape[1] + 6))
-        container[:, 3:(container.shape[1] - 3)] = reg
-        # cv2.imshow("Image", container)
-        # cv2.waitKey(0)
+        yy = p.shape[0] - 1
+        path, cost = route_through_array(p, start=(yy, xx1), end=(yy, xx2),
+                                         fully_connected=True)
+        if cost < 2000:  # path found
+            p = costs[maxTransIndex: y2, endIndex - 1:startIndex + 2]
+            xx1 = 0 + 1
+            xx2 = p.shape[1] - 2
 
-        container = container.copy()
+            yy = 0
+            path, cost = route_through_array(p, start=(yy, xx1), end=(yy, xx2),
+                                             fully_connected=True)
 
-        # shapeMask = cv2.inRange(reg, lower, upper)
-        shapeMask = (container.copy()).astype("uint8")
-        shapeMask[shapeMask > 0] = 4
-        shapeMask[shapeMask == 0] = 255
-        shapeMask[shapeMask == 4] = 0
-
-        _, cnts, h = cv2.findContours(shapeMask, cv2.RETR_CCOMP,
-                                      cv2.CHAIN_APPROX_SIMPLE)
-
-        mask = np.zeros((shapeMask.shape[0], shapeMask.shape[1]))
-
-        # loop over the contours
-        k = 0
-        for c in cnts:
-            # draw the contour and show it
-            cv2.drawContours(mask, [c], -1, 255, -1)
-            # cv2.imshow("Image", mask)
-            # cv2.waitKey(0)
-            pos = np.where(mask == 255)
-
-            black = 0
-            white = 0
-            print(h[0][k][0])
-
-            if h[0][k][0] > 0:
-                for m in range(len(pos[0])):
-                    for _ in range(len(pos[1])):
-                        if shapeMask[pos[0][m]][pos[1][m]] == 255:
-                            white += 1
-                        else:
-                            black += 1
-
-            if 2 * black < white:
-                cv2.drawContours(reg, [c], -1, 255, -1)
-                # cv2.imshow("Image", reg)
-                # cv2.waitKey(0)
-
-            mask = np.zeros((shapeMask.shape[0], shapeMask.shape[1]))
-            k += 1
+            if cost < 2000:  # path found --> loop, IGNORE
+                filteredCuts.append(cutIndex)
+                currentTransPositions[i] = -1
+                currentTransPositions[i + 1] = -1
+                cutPositions[cut - 1] = -1
+                continue
         # ############################################ END OF CASE 2 ##################################################
 
         # CASE3: seen, sheen, sad, dad, qaf, noon at the end of sub-word handling:
@@ -463,9 +433,6 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
             if newEndIndex == -1:  # if next cut is already categorized
                 continue
 
-            # maxHeightPos = np.where(image[y1:baseline, newEndIndex:newStartIndex] > 0)
-            #
-            # maxHeightPos = min(maxHeightPos[0]) + y1
             midHeightPos = int((y1 + baseline) / 2)
 
             newSumBelowBaseline = np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex], 1)
@@ -478,16 +445,13 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
 
             maxHeightPos = y1 + lastZero + 1
 
-            # newSumBelowBaseline = np.sum(np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex], 1))
-            # newSumAboveBaseline = np.sum(np.sum(image[y1:baseline, newEndIndex + 1:newStartIndex], 1))
-
             if newSumAboveBaseline > newSumBelowBaseline and maxHeightPos < baseline and maxHeightPos > midHeightPos and \
                     projections[cutIndex] <= (MFV +255):
-                segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
+                # segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
                 print("stroke found")
             else:
                 # segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
-                print("stroke found")
+                print("not-stroke found")
 
     return segmented, filteredCuts
 
@@ -552,7 +516,7 @@ def wordSegmentation(image, lineBreaks, maximas):
         # for each sub word in the current line
         for j in range(len(maximasTest[0]) - 1):
             x1, x2 = maximasTest[0][j], maximasTest[0][j + 1]
-            if i== 0 and x1 > 188:
+            if i== 7:
                 print("Ho")
             currentTransPositions = getTransInSubWord(image, x1, x2, maxTransitionsIndex)
             currentCutPositions = getCutEdgesInSubWord(currentTransPositions, horPro, MFV)
@@ -561,8 +525,8 @@ def wordSegmentation(image, lineBreaks, maximas):
             segmented, validCuts = getFilteredCutPoints(image, y1, y2, currentTransPositions, currentCutPositions, horPro, maximas[0][i], maxTransitionsIndex, MFV, lineHeight, segmented)
 
 
-            # for indx in range(len(currentCutPositions)):
-            #     segmented = cv2.line(segmented, (currentCutPositions[indx], y1), (currentCutPositions[indx], y2), (255, 0, 0), 1)
+            for indx in range(len(validCuts)):
+                 segmented = cv2.line(segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
 
             # segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
 

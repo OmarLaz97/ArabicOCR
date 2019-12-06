@@ -30,3 +30,67 @@ def getAvgZero(indexArrays):
         start = tempStart
 
     return avg
+
+
+///////////////////
+
+        # loopFound = False
+        # reg = image[y1:y2, endIndex - 2:startIndex + 2]
+        # # viewer = ImageViewer(reg)
+        # # viewer.show()
+        # reg = reg.copy()
+        #
+        # container = np.zeros((reg.shape[0], reg.shape[1] + 6))
+        # container[:, 3:(container.shape[1] - 3)] = reg
+        # # cv2.imshow("Image", container)
+        # # cv2.waitKey(0)
+        #
+        # container = container.copy()
+        #
+        # # shapeMask = cv2.inRange(reg, lower, upper)
+        # shapeMask = (container.copy()).astype("uint8")
+        # # shapeMask[shapeMask > 0] = 4
+        # # shapeMask[shapeMask == 0] = 255
+        # # shapeMask[shapeMask == 4] = 0
+        #
+        # _, cnts, h = cv2.findContours(shapeMask, cv2.RETR_CCOMP,
+        #                               cv2.CHAIN_APPROX_SIMPLE)
+        #
+        # mask = np.zeros((shapeMask.shape[0], shapeMask.shape[1]))
+        #
+        # # loop over the contours
+        # k = 0
+        # for c in cnts:
+        #     # draw the contour and show it
+        #     cv2.drawContours(mask, [c], -1, 255, -1)
+        #     # cv2.imshow("Image", mask)
+        #     # cv2.waitKey(0)
+        #     pos = np.where(mask == 255)
+        #
+        #     black = 0
+        #     white = 0
+        #     print(h[0][k][0])
+        #
+        #     if h[0][k][0] > 0:
+        #         for m in range(len(pos[0])):
+        #             for n in range(len(pos[1])):
+        #                 if shapeMask[pos[0][m]][pos[1][n]] == 0:
+        #                     black += 1
+        #                 else:
+        #                     white += 1
+        #
+        #
+        #     if white < black:
+        #         # cv2.drawContours(reg, [c], -1, 255, -1)
+        #         print("Loop found")
+        #         loopFound = True
+        #         break
+        #         # cv2.imshow("Image", reg)
+        #         # cv2.waitKey(0)
+        #
+        #     mask = np.zeros((shapeMask.shape[0], shapeMask.shape[1]))
+        #     k += 1
+        #
+        # if loopFound:
+        #     filteredCuts.append(cutIndex)
+        #     continue
