@@ -410,17 +410,30 @@ def getFilteredCutPoints(image, y1, y2, currentTransPositions, cutPositions, pro
             if newEndIndex == -1:  # if next cut is already categorized
                 continue
 
-            maxHeightPos = np.where(image[y1:baseline, newEndIndex:newStartIndex] > 0)
-
-            maxHeightPos = min(maxHeightPos[0]) + y1
+            # maxHeightPos = np.where(image[y1:baseline, newEndIndex:newStartIndex] > 0)
+            #
+            # maxHeightPos = min(maxHeightPos[0]) + y1
             midHeightPos = int((y1 + baseline) / 2)
 
-            newSumBelowBaseline = np.sum(np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex], 1))
-            newSumAboveBaseline = np.sum(np.sum(image[y1:baseline, newEndIndex + 1:newStartIndex], 1))
+            newSumBelowBaseline = np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex], 1)
+            firstZero = np.where(newSumBelowBaseline == 0)[0][0]
+            newSumBelowBaseline = np.sum(newSumBelowBaseline[0:firstZero])
+
+            newSumAboveBaseline = np.sum(image[y1:baseline, newEndIndex + 1:newStartIndex], 1)
+            lastZero = np.where(newSumAboveBaseline == 0)[0][-1]
+            newSumAboveBaseline = np.sum(newSumAboveBaseline[lastZero:])
+
+            maxHeightPos = y1 + lastZero + 1
+
+            # newSumBelowBaseline = np.sum(np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex], 1))
+            # newSumAboveBaseline = np.sum(np.sum(image[y1:baseline, newEndIndex + 1:newStartIndex], 1))
 
             if newSumAboveBaseline > newSumBelowBaseline and maxHeightPos < baseline and maxHeightPos > midHeightPos and \
-                    projections[cutIndex] <= MFV:
+                    projections[cutIndex] <= (MFV +255):
                 segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
+                print("stroke found")
+            else:
+                # segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
                 print("stroke found")
 
     return segmented, filteredCuts
@@ -486,7 +499,7 @@ def wordSegmentation(image, lineBreaks, maximas):
         # for each sub word in the current line
         for j in range(len(maximasTest[0]) - 1):
             x1, x2 = maximasTest[0][j], maximasTest[0][j + 1]
-            if x1 > 545:
+            if i== 0 and x1 > 188:
                 print("Ho")
             currentTransPositions = getTransInSubWord(image, x1, x2, maxTransitionsIndex)
             currentCutPositions = getCutEdgesInSubWord(currentTransPositions, horPro, MFV)
