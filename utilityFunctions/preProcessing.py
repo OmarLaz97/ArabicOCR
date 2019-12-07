@@ -358,10 +358,11 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
         # top-left height of current region
         topLeftHeight = np.where(image[y1:baseline, endIndex - 2:endIndex + 1] > 0)
         topLeftHeight = min(topLeftHeight[0]) + y1
-        topLeftHeight = baseline - topLeftHeight
+
+        midHeightPos = int((y1 + baseline) / 2)
 
         doubleCheckLastRegion = min(projections[endIndex], projections[endIndex-1], projections[endIndex-2], projections[endIndex-3])
-        if cut >= len(cutPositions) and doubleCheckLastRegion == 0 and topLeftHeight < 0.5*lineHeight:
+        if cut >= len(cutPositions) and doubleCheckLastRegion == 0 and topLeftHeight > midHeightPos:
             # filteredCuts.append(cutIndex)
             cutPositions[cut-1] = -1
             continue
@@ -371,6 +372,14 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
     if len(cutPositions) >0 and max(cutPositions) == -1: # all transitions is categorized as valid or invalid
         return segmented, filteredCuts
+
+    #CASE found while debugging
+    if len(cutPositions) == 1 and cutPositions[0] > 0 and projections[cutPositions[0]] <= MFV:
+        filteredCuts.append(cutPositions[0])
+
+    if len(cutPositions) > 1 and cutPositions[-1] == -2 and cutPositions[len(cutPositions)-2] > 0:
+        filteredCuts.append(cutPositions[len(cutPositions)-2])
+
 
     strokes = []
     dots = []
@@ -473,6 +482,18 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
             strokes = [newStart, newEnd] + strokes
             dots = [0] + dots
 
+
+    # CASE found by debugging, may need improvements
+    if len(strokes) > 1 and cutPositions[0] == -2:
+        filteredCuts.append(strokes[0])
+        # segmented = cv2.line(segmented, (strokes[0], y1), (strokes[0], y2), (255, 0, 0), 1)
+    elif len(strokes) == 0 and len(cutPositions) > 1 and cutPositions[0] == -2 and cutPositions[1] > 0:
+        if len(cutPositions) > 2 and cutPositions[2] == -1:
+            print("invalid")
+        else:
+            filteredCuts.append(cutPositions[1])
+            # segmented = cv2.line(segmented, (cutPositions[1], y1), (cutPositions[1], y2), (255, 0, 0), 1)
+
     i = 0
     while i < len(strokes):
         newStartIndex = strokes[i]
@@ -565,8 +586,6 @@ def wordSegmentation(image, lineBreaks, maximas):
         # for each sub word in the current line
         for j in range(len(maximasTest[0]) - 1):
             x1, x2 = maximasTest[0][j], maximasTest[0][j + 1]
-            if i == 0 and x2 > 130:
-                print("test")
             currentTransPositions = getTransInSubWord(image, x1, x2, maxTransitionsIndex)
             currentCutPositions = getCutEdgesInSubWord(currentTransPositions, horPro, MFV)
 
