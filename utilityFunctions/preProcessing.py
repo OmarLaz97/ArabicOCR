@@ -3,7 +3,6 @@ import numpy as np
 import skimage.transform as trans
 from scipy.signal import argrelextrema
 from skimage.graph import route_through_array
-from skimage.viewer import ImageViewer
 from sklearn.neighbors import KernelDensity
 
 
@@ -556,7 +555,8 @@ def wordSegmentation(image, lineBreaks, maximas):
         horPro = np.sum(line, 0)
 
         # Most frequent value (MFV), which represents the width of the baseline
-        MFV = np.bincount(horPro[horPro != 0]).astype(np.uint8).argmax()
+        horPro = horPro.astype('int64')
+        MFV = np.bincount(horPro[horPro != 0]).argmax()
 
         # Hanshouf fein amaken el zeros
         # El mafroud ba3d el smoothing yetla3li amaken el zeros
@@ -586,6 +586,8 @@ def wordSegmentation(image, lineBreaks, maximas):
         # for each sub word in the current line
         for j in range(len(maximasTest[0]) - 1):
             x1, x2 = maximasTest[0][j], maximasTest[0][j + 1]
+            # if i == 0 and x2 > 130:
+            #     print("test")
             currentTransPositions = getTransInSubWord(image, x1, x2, maxTransitionsIndex)
             currentCutPositions = getCutEdgesInSubWord(currentTransPositions, horPro, MFV)
 
