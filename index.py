@@ -57,5 +57,6 @@ lineBreakedImg, lineBreaks = getLineBreaks(newImage, maximas)
 
 # Segmenting the lines and words
 linesWordsSegmented = wordSegmentation(newImage, lineBreaks, maximas)
+# cv2.imwrite("cap2Output.png", linesWordsSegmented)
 viewer = ImageViewer(linesWordsSegmented)
 viewer.show()

@@ -372,14 +372,18 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
     if len(cutPositions) >0 and max(cutPositions) == -1: # all transitions is categorized as valid or invalid
         return segmented, filteredCuts
 
-    #CASE found while debugging
-    if len(cutPositions) == 1 and cutPositions[0] > 0 and projections[cutPositions[0]] <= MFV:
-        filteredCuts.append(cutPositions[0])
+    # CASE 6: found while debugging: if there is only one uncategorized and projection at this cut index <= MFV, APPEND
+    # PROBLEM: sad and dad at the end of the sub-word
+    uncategorized = np.where(np.array(cutPositions) > 0)
+    if len(uncategorized[0]) == 1 and projections[uncategorized[0][0]] <= MFV:
+        filteredCuts.append(cutPositions[uncategorized[0][0]])
 
+
+    # CASE 7: loop at the end of the word, if cut index before it is uncategorized, APPEND
     if len(cutPositions) > 1 and cutPositions[-1] == -2 and cutPositions[len(cutPositions)-2] > 0:
         filteredCuts.append(cutPositions[len(cutPositions)-2])
 
-
+    # Get strokes and corresponding dots, 1 -> above, -1 -> below, 0 -> none
     strokes = []
     dots = []
     cut = 0
@@ -390,8 +394,7 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
         if cutIndex == -1 or cutIndex == -2:
             continue
 
-        # STROKES and NO STROKES
-        # detecting stroke, should be placed in a function to be called for several characters at the same time
+        # STROKES and NO STROKES detection
         if cut < len(cutPositions):  # if there is a next region
             newStartIndex = cutIndex
             newEndIndex = cutPositions[cut]
@@ -400,12 +403,12 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
             if newEndIndex == -1:  # if next cut is already categorized
                 continue
-            elif newEndIndex == -2 and cut + 1 < len(cutPositions):
-                if cutPositions[cut + 1] < 0:
+            elif newEndIndex == -2 and cut + 1 < len(cutPositions):  # next is in loop, take next of next if any
+                if cutPositions[cut + 1] < 0:  # if next of next is still invalid, skip
                     continue
-                newEndIndex = cutPositions[cut + 1]
+                newEndIndex = cutPositions[cut + 1]  # else, take it
                 loopFound = True
-            elif newEndIndex == -2 and cut + 1 >= len(cutPositions):
+            elif newEndIndex == -2 and cut + 1 >= len(cutPositions):  # next of next doesn't exist, skip
                 continue
 
             midHeightPos = int((y1 + baseline) / 2)
@@ -420,20 +423,28 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
             maxHeightPos = y1 + lastZero + 1
 
+            dotsBelow = np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex], 1)
+            firstZero = np.where(dotsBelow == 0)[0][0]
 
+            dotsAbove = np.sum(image[y1:baseline, newEndIndex + 1:newStartIndex], 1)
+            lastZero = np.where(dotsAbove == 0)[0][-1]
+
+            horProj = image[y1 + lastZero: maxTransIndex, newEndIndex: newStartIndex + 1]
+            horProj = np.sum(horProj, 1)
+
+            variations = True
+            if max(horProj) <= 3 * 255:
+                variations = False
+
+            # conditions of STROKE
             if newSumAboveBaseline > newSumBelowBaseline and maxHeightPos < baseline and maxHeightPos > midHeightPos and \
-                    projections[cutIndex] <= (MFV +255) and not loopFound:
+                    projections[cutIndex] <= (MFV +255) and not loopFound and not variations:
                 # segment is a stroke
                 # segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
                 strokes.append(newStartIndex)
                 strokes.append(newEndIndex)
 
-                dotsBelow = np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex], 1)
-                firstZero = np.where(dotsBelow == 0)[0][0]
                 dotsBelow = np.sum(dotsBelow[firstZero:])
-
-                dotsAbove = np.sum(image[y1:baseline, newEndIndex + 1:newStartIndex], 1)
-                lastZero = np.where(dotsAbove == 0)[0][-1]
                 dotsAbove = np.sum(dotsAbove[:lastZero])
 
                 if dotsBelow == 0 and dotsAbove == 0:
@@ -455,6 +466,7 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
     if len(strokes) > 0 and len(cutPositions) > 0 and strokes[0] == cutPositions[0]:
         # there is a probability of the existence of seen or sheen at the beg of sub-word
+        # append the first stroke of seen or sheen to the beginning of strokes array
         newStart = x2 +1
         newEnd = cutPositions[0]
 
@@ -586,8 +598,6 @@ def wordSegmentation(image, lineBreaks, maximas):
         # for each sub word in the current line
         for j in range(len(maximasTest[0]) - 1):
             x1, x2 = maximasTest[0][j], maximasTest[0][j + 1]
-            # if i == 0 and x2 > 130:
-            #     print("test")
             currentTransPositions = getTransInSubWord(image, x1, x2, maxTransitionsIndex)
             currentCutPositions = getCutEdgesInSubWord(currentTransPositions, horPro, MFV)
 
