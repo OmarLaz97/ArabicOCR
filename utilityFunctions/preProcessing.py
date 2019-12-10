@@ -260,7 +260,7 @@ def isSegmentStroke():
     return True
 
 #  given all possible cuts within a sub-word, return only valid ones
-def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions, projections, baseline, maxTransIndex, MFV, lineHeight, segmented):
+def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions, projections, baseline, maxTransIndex, MFV, segmented):
     filteredCuts = []
 
     if len(currentTransPositions) < 1:
@@ -276,7 +276,7 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
     costs = np.where(path, 1, 1000)
 
     cut = 0  # index of cut positions, each cut position corresponds to 2 transition index (start and end)
-
+    cutPositionsOrg = cutPositions.copy()
     for i in range(0, len(currentTransPositions) - 1, 2):
         startIndex = currentTransPositions[i]
         endIndex = currentTransPositions[i + 1]
@@ -292,7 +292,7 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
         path, cost = route_through_array(costs, start=(maxTransIndex, startIndex), end=(maxTransIndex, endIndex), fully_connected=True)
         if cost >= 1000:  # no path found, APPEND
             filteredCuts.append(cutIndex)
-            cutPositions[cut-1] = -1
+            cutPositions[cut-1] = -3
             continue
 
         # ############################################ END OF CASE 1 ##################################################
@@ -393,6 +393,8 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
         if cutIndex == -1 or cutIndex == -2:
             continue
+        elif cutIndex == -3:
+            cutIndex = cutPositionsOrg[cut-1]
 
         # STROKES and NO STROKES detection
         if cut < len(cutPositions):  # if there is a next region
@@ -401,7 +403,7 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
             loopFound = False
 
-            if newEndIndex == -1:  # if next cut is already categorized
+            if newEndIndex == -1 or newEndIndex == -3:  # if next cut is already categorized
                 continue
             elif newEndIndex == -2 and cut + 1 < len(cutPositions):  # next is in loop, take next of next if any
                 if cutPositions[cut + 1] < 0:  # if next of next is still invalid, skip
@@ -423,7 +425,7 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
             maxHeightPos = y1 + lastZero + 1
 
-            dotsBelow = np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex], 1)
+            dotsBelow = np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex-1], 1)
             firstZero = np.where(dotsBelow == 0)[0][0]
 
             dotsAbove = np.sum(image[y1:baseline, newEndIndex + 1:newStartIndex], 1)
@@ -591,10 +593,6 @@ def wordSegmentation(image, lineBreaks, maximas):
         # Law gebna el maximas beta3et el prob array da hateb2a heya di amaken el at3 mazbouta inshallah
         maximasTest = argrelextrema(prob, np.greater)
 
-        lineHeight = np.where(image[y1:maximas[0][i], :] > 0)
-        lineHeight = lineHeight[0][0] + y1
-        lineHeight = maximas[0][i] - lineHeight
-
         # for each sub word in the current line
         for j in range(len(maximasTest[0]) - 1):
             x1, x2 = maximasTest[0][j], maximasTest[0][j + 1]
@@ -602,7 +600,7 @@ def wordSegmentation(image, lineBreaks, maximas):
             currentCutPositions = getCutEdgesInSubWord(currentTransPositions, horPro, MFV)
 
             # validCuts = getFilteredCutPoints(image, y1, y2, currentTransPositions, currentCutPositions, horPro, maximas[0][i], maxTransitionsIndex, MFV, lineHeight, segmented)
-            segmented, validCuts = getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, currentCutPositions, horPro, maximas[0][i], maxTransitionsIndex, MFV, lineHeight, segmented)
+            segmented, validCuts = getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, currentCutPositions, horPro, maximas[0][i], maxTransitionsIndex, MFV, segmented)
 
 
             for indx in range(len(validCuts)):
