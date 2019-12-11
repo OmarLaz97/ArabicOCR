@@ -3,8 +3,59 @@ import numpy as np
 import skimage.transform as trans
 from scipy.signal import argrelextrema
 from skimage.graph import route_through_array
+from skimage.viewer import ImageViewer
 from sklearn.neighbors import KernelDensity
 
+Alphabets = {
+   "ا": 0,
+   "ب":1,
+   "ت":2,
+   "ث":3,
+    "ج": 4,
+    "ح": 5,
+    "خ": 6,
+    "د": 7,
+    "ذ": 8,
+    "ر": 9,
+    "ز": 10,
+    "س": 11,
+    "ش": 12,
+    "ص": 13,
+    "ض": 14,
+    "ط": 15,
+    "ظ": 16,
+    "ع": 17,
+    "غ": 18,
+    "ف": 19,
+    "ق": 20,
+    "ك": 21,
+    "ل": 22,
+    "م": 23,
+    "ن": 24,
+    "ه": 25,
+    "و": 26,
+    "ي": 27,
+    "لا": 28,
+    ")": 29,
+    "(": 30,
+    ":": 31,
+    ".": 32,
+    "ة": 33,
+    "ؤ":34,
+    "ئ":35,
+    "ى":36
+}
+
+def find_all(orgString, subString):
+   index = -1
+   result = []
+   while True:
+      index = orgString.find(subString, index + 1, len(orgString))
+      if index != -1:
+         result.append(index)
+      else:
+         break
+   return result
 
 # rotation maram
 def getRotatedImg(img):
@@ -255,9 +306,6 @@ def getCutEdgesInSubWord(currentTransPositions, projections, MFV):
                 cutPositions.append(middleIndex)
 
     return cutPositions
-
-def isSegmentStroke():
-    return True
 
 #  given all possible cuts within a sub-word, return only valid ones
 def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions, projections, baseline, maxTransIndex, MFV, segmented):
@@ -538,9 +586,155 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
     return segmented, filteredCuts
 
+def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsIndex, MFV, projections, orgWord, report, imgsCounter):
+    # viewer = ImageViewer(img[y1:y2, x1:x2])
+    # viewer.show()
+    # get projection
+    horPro = np.sum(img[y1:y2, x1:x2], 0)
+
+    # get indices of non zeros (to be able to detect the start and end of word and ignore background)
+    # and return if all are zeros
+    indexOfNonZeros =  [i for i, e in enumerate(horPro) if e != 0]
+    if (len(indexOfNonZeros) == 0):
+        return segmented, imgsCounter
+
+    # replace the two clusters of zeros on the 2 extremes(background) by -1 so that only zeros within the word is considered
+    horPro[0:indexOfNonZeros[0]] = -1
+    horPro[indexOfNonZeros[-1]:len(horPro)] = -1
+
+    # get the zeros within word
+    zeroCrossings = np.where(horPro== 0.0)
+
+    # if no zeros found, return
+    if (len(zeroCrossings[0])==0):
+        currentTransPositions = getTransInSubWord(img, x1, x2, maxTransitionsIndex)
+        currentCutPositions = getCutEdgesInSubWord(currentTransPositions, projections, MFV)
+
+        # validCuts = getFilteredCutPoints(image, y1, y2, currentTransPositions, currentCutPositions, horPro, maximas[0][i], maxTransitionsIndex, MFV, lineHeight, segmented)
+        segmented, validCuts = getFilteredCutPoints(img, x2, y1, y2, currentTransPositions, currentCutPositions,
+                                                    projections, baseline, maxTransitionsIndex, MFV, segmented)
+
+
+        validCuts = [x1] + [x2] + validCuts
+        validCuts.sort(reverse=True)
+        validCuts = list(dict.fromkeys(validCuts))
+        wordLength = len(validCuts) -1
+
+        laPositions = find_all(orgWord, "لا")
+        laIndex = 0
+
+        if wordLength == (len(orgWord) - len(laPositions)):
+            indx = 0
+            while indx < (len(validCuts) -1):
+                beg = validCuts[indx]
+                end = validCuts[indx+1]
+                name = str(imgsCounter) + ".png"
+                name = "./outputs/" + name
+                cv2.imwrite(name, cv2.resize(img[y1:y2, end:beg], (30, 30)))
+                if len(laPositions) > 0 and laIndex< len(laPositions) and indx == laPositions[laIndex]:
+                    report.write(str(imgsCounter) + ".png" + " " + str(Alphabets[orgWord[indx:indx+2]]) + "\n")
+                    indx += 1
+                    laIndex += 1
+                else:
+                    report.write(str(imgsCounter) + ".png" + " " + str(Alphabets[orgWord[indx]]) + "\n")
+                imgsCounter += 1
+                indx += 1
+                # viewer = ImageViewer(img[y1:y2, end:beg])
+                # viewer.show()
+        else:
+            print(orgWord)
+
+
+        for indx in range(len(validCuts)):
+            segmented = cv2.line(segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
+        # segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
+        return segmented, imgsCounter
+
+    # getting positions of lines accurately (similar to wordSegmentation function)
+    kde = KernelDensity().fit(zeroCrossings[0][:, None])
+
+    bins = np.linspace(0, img[y1:y2, x1:x2].shape[1], img[y1:y2, x1:x2].shape[1])
+
+    logProb = kde.score_samples(bins[:, None])
+
+    prob = np.exp(logProb)
+
+    maximasTest = argrelextrema(prob, np.greater)
+
+    # append 0 at the beginning for drawing
+    maximasTest2 = [0]
+
+    for i in range(len(maximasTest[0])):
+        maximasTest2.append(maximasTest[0][i])
+
+    #for drawing
+    maximasTest2.append(x2-x1)
+    maximasTest2 = maximasTest2[::-1]
+    validCutsFinal =[]
+    # for each subword, get characters
+    for j in range(len(maximasTest2)-1):
+        xx1 = maximasTest2[j+1]+x1
+        xx2 = maximasTest2[j]+x1
+        currentTransPositions = getTransInSubWord(img, xx1, xx2, maxTransitionsIndex)
+        currentCutPositions = getCutEdgesInSubWord(currentTransPositions, projections, MFV)
+
+        # validCuts = getFilteredCutPoints(image, y1, y2, currentTransPositions, currentCutPositions, horPro, maximas[0][i], maxTransitionsIndex, MFV, lineHeight, segmented)
+        segmented, validCuts = getFilteredCutPoints(img, xx2, y1, y2, currentTransPositions, currentCutPositions,
+                                                    projections, baseline, maxTransitionsIndex, MFV, segmented)
+
+        # for indx in range(len(validCuts)):
+        #     segmented = cv2.line(segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
+
+        validCutsFinal += [xx1] + [xx2] + validCuts
+
+
+        # segmented = cv2.rectangle(segmented, (xx1, y1), (xx2, y2), (255, 0, 0), 1)
+
+    validCutsFinal.sort(reverse=True)
+    validCutsFinal = list(dict.fromkeys(validCutsFinal))
+
+    k =0
+    while k < len(validCutsFinal)-1:
+        if abs(validCutsFinal[k] - validCutsFinal[k+1]) <=2:
+            validCutsFinal.pop(k+1)
+        k +=1
+    wordLength = len(validCutsFinal)-1
+
+    laPositions = find_all(orgWord, "لا")
+    laIndex = 0
+
+    if wordLength == (len(orgWord) - len(laPositions)):
+        indx = 0
+        while indx < (len(validCutsFinal) - 1):
+            beg = validCutsFinal[indx]
+            end = validCutsFinal[indx + 1]
+            name = str(imgsCounter) + ".png"
+            name = "./outputs/" + name
+            cv2.imwrite(name, cv2.resize(img[y1:y2, end:beg], (30, 30)))
+            if len(laPositions) > 0 and laIndex< len(laPositions) and indx == laPositions[laIndex]:
+                report.write(str(imgsCounter) + ".png" + " " + str(Alphabets[orgWord[indx:indx + 2]]) + "\n")
+                indx += 1
+                laIndex += 1
+            else:
+                report.write(str(imgsCounter) + ".png" + " " + str(Alphabets[orgWord[indx]]) + "\n")
+            imgsCounter += 1
+            indx += 1
+            # viewer = ImageViewer(img[y1:y2, end:beg])
+            # viewer.show()
+    else:
+        print(orgWord)
+
+    for indx in range(len(validCutsFinal)):
+        segmented = cv2.line(segmented, (validCutsFinal[indx], y1), (validCutsFinal[indx], y2), (255, 0, 0), 1)
+
+
+    return segmented, imgsCounter
+
 
 # Function to segment the lines and words in these lines
-def wordSegmentation(image, lineBreaks, maximas):
+def wordSegmentation(image, lineBreaks, maximas, words, report):
+    wordCounter = 0
+    imgsCounter = 1
     """
     :param image: binary image
     :param lineBreaks: line breaks array
@@ -553,12 +747,6 @@ def wordSegmentation(image, lineBreaks, maximas):
         y1, y2 = lineBreaks[i], lineBreaks[i + 1]
         maxTransitionsIndex = getMaxTransitionsIndex(image, y1, maximas[0][i])
 
-        # segmented = cv2.line(segmented, (0, maxTransitionsIndex), (image.shape[1], maxTransitionsIndex), (255, 0, 0), 1)
-        # segmented = cv2.line(segmented, (0, maximas[0][i]), (image.shape[1], maximas[0][i]), (255, 0, 0), 1)
-        #
-        # for indx in range(len(transPositions)):
-        #     segmented = cv2.line(segmented, (transPositions[indx], y1), (transPositions[indx], y2), (255, 0, 0), 1)
-
         line = image.copy()
         # Segment each line in the image and create a new image for each line
         # To be able to do a vertical projection and segment the words
@@ -566,7 +754,9 @@ def wordSegmentation(image, lineBreaks, maximas):
 
         # Hane3mel vertical projection 3adi ba3d
         # Keda hane3mel convolution 3ashan ne smooth el curve
+        window = [1, 1, 1, 1, 1]
         horPro = np.sum(line, 0)
+        ConvProj = np.convolve(horPro, window)
 
         # Most frequent value (MFV), which represents the width of the baseline
         horPro = horPro.astype('int64')
@@ -575,7 +765,7 @@ def wordSegmentation(image, lineBreaks, maximas):
         # Hanshouf fein amaken el zeros
         # El mafroud ba3d el smoothing yetla3li amaken el zeros
         # Ely bein el kalmat we ba3d 3ashan benhom masafa kebira
-        zeroCrossings = np.where(horPro == 0.0)
+        zeroCrossings = np.where(ConvProj == 0.0)
 
         # El array ely esmo zero crossing da beyeb2a gowah range el amaken ely fiha zeros ketyr
         # Momken law 3amalnalo clustering we gebna el mean beta3 kol cluster da yeb2a makan el 2at3 ely hanesta5demo
@@ -592,20 +782,13 @@ def wordSegmentation(image, lineBreaks, maximas):
         prob = np.exp(logProb)
         # Law gebna el maximas beta3et el prob array da hateb2a heya di amaken el at3 mazbouta inshallah
         maximasTest = argrelextrema(prob, np.greater)
+        maximasTest = maximasTest[0][::-1]
 
-        # for each sub word in the current line
-        for j in range(len(maximasTest[0]) - 1):
-            x1, x2 = maximasTest[0][j], maximasTest[0][j + 1]
-            currentTransPositions = getTransInSubWord(image, x1, x2, maxTransitionsIndex)
-            currentCutPositions = getCutEdgesInSubWord(currentTransPositions, horPro, MFV)
-
-            # validCuts = getFilteredCutPoints(image, y1, y2, currentTransPositions, currentCutPositions, horPro, maximas[0][i], maxTransitionsIndex, MFV, lineHeight, segmented)
-            segmented, validCuts = getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, currentCutPositions, horPro, maximas[0][i], maxTransitionsIndex, MFV, segmented)
-
-
-            for indx in range(len(validCuts)):
-                 segmented = cv2.line(segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
-
+        # for each word in the current line
+        for j in range(len(maximasTest) - 1):
+            x2, x1 = maximasTest[j], maximasTest[j + 1]
+            segmented, imgsCounter = subWordSegmentation(image, segmented, y1, y2, x1, x2,maximas[0][i], maxTransitionsIndex, MFV, horPro, words[wordCounter], report, imgsCounter)
             segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
+            wordCounter +=1
 
     return segmented

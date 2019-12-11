@@ -11,6 +11,13 @@ img = io.imread('./testImages/capr2.png')
 viewer = ImageViewer(img)
 viewer.show()
 
+with open('./testTexts/capr2.txt', encoding='utf-8') as f:
+   words =  [word for line in f for word in line.split()]
+
+print(words)
+
+report = open("report.txt", "w")
+
 # Skew Correction
 # Getting first the right angle of rotation, then rotating the original image
 # angle = skewNormal(img)
@@ -56,7 +63,7 @@ baselinedImage, maximas = Baseline(newImage)
 lineBreakedImg, lineBreaks = getLineBreaks(newImage, maximas)
 
 # Segmenting the lines and words
-linesWordsSegmented = wordSegmentation(newImage, lineBreaks, maximas)
+linesWordsSegmented = wordSegmentation(newImage, lineBreaks, maximas, words, report)
 # cv2.imwrite("cap2Output.png", linesWordsSegmented)
 viewer = ImageViewer(linesWordsSegmented)
 viewer.show()
