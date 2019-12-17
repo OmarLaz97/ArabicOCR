@@ -7,16 +7,21 @@ from utilityFunctions.preProcessing import *
 # Reading the image
 # FIXME: capr1.png bayza 5ales !
 # TODO: Maybe we need to divide pictures with length bigger than a certain threshold ????
-img = io.imread('./testImages/capr2.png')
+input = "capr14"
+img = io.imread("./testImages/"+ str(input) + ".png")
 viewer = ImageViewer(img)
 viewer.show()
 
-with open('./testTexts/capr2.txt', encoding='utf-8') as f:
-   words =  [word for line in f for word in line.split()]
+with open("./testTexts/" + str(input) + ".txt", encoding='utf-8') as f:
+   words = [word for line in f for word in line.split()]
 
-print(words)
 
-report = open("report.txt", "w")
+errorReport = open("./outputs/" + str(input) + "/ErrorReport.txt", "w", encoding='utf-8')
+errorReport.write((str(len(words))) + "\n")
+
+report = open("./outputs/" + str(input) + "/report.txt", "w")
+
+imgsPath = "./outputs/" + str(input) + "/imgs/"
 
 # Skew Correction
 # Getting first the right angle of rotation, then rotating the original image
@@ -63,7 +68,8 @@ baselinedImage, maximas = Baseline(newImage)
 lineBreakedImg, lineBreaks = getLineBreaks(newImage, maximas)
 
 # Segmenting the lines and words
-linesWordsSegmented = wordSegmentation(newImage, lineBreaks, maximas, words, report)
-# cv2.imwrite("cap2Output.png", linesWordsSegmented)
+linesWordsSegmented = wordSegmentation(newImage, lineBreaks, maximas, words, report, errorReport, imgsPath)
+outputName = "./outputs/" + str(input) + "/" + str(input) + "Out.png"
+cv2.imwrite(outputName, linesWordsSegmented)
 viewer = ImageViewer(linesWordsSegmented)
 viewer.show()

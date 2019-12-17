@@ -43,7 +43,21 @@ Alphabets = {
     "ة": 33,
     "ؤ":34,
     "ئ":35,
-    "ى":36
+    "ى":36,
+    "أ":37,
+"ء":38,
+"،":39,
+"إ":40,
+    "0":41,
+    "1":42,
+    "2":43,
+    "3":44,
+    "4":45,
+    "5":46,
+    "6":47,
+    "7":48,
+    "8":49,
+    "9":50
 }
 
 def find_all(orgString, subString):
@@ -549,9 +563,7 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
         filteredCuts.append(strokes[0])
         # segmented = cv2.line(segmented, (strokes[0], y1), (strokes[0], y2), (255, 0, 0), 1)
     elif len(strokes) == 0 and len(cutPositions) > 1 and cutPositions[0] == -2 and cutPositions[1] > 0:
-        if len(cutPositions) > 2 and cutPositions[2] == -1:
-            print("invalid")
-        else:
+        if not(len(cutPositions) > 2 and cutPositions[2] == -1):
             filteredCuts.append(cutPositions[1])
             # segmented = cv2.line(segmented, (cutPositions[1], y1), (cutPositions[1], y2), (255, 0, 0), 1)
 
@@ -586,7 +598,7 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
     return segmented, filteredCuts
 
-def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsIndex, MFV, projections, orgWord, report, imgsCounter):
+def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsIndex, MFV, projections, orgWord, report, imgsCounter, errorReport, imgsPath):
     # viewer = ImageViewer(img[y1:y2, x1:x2])
     # viewer.show()
     # get projection
@@ -629,7 +641,7 @@ def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsI
                 beg = validCuts[indx]
                 end = validCuts[indx+1]
                 name = str(imgsCounter) + ".png"
-                name = "./outputs/" + name
+                name = imgsPath + name
                 cv2.imwrite(name, cv2.resize(img[y1:y2, end:beg], (30, 30)))
                 if len(laPositions) > 0 and laIndex< len(laPositions) and indx == laPositions[laIndex]:
                     report.write(str(imgsCounter) + ".png" + " " + str(Alphabets[orgWord[indx:indx+2]]) + "\n")
@@ -642,11 +654,11 @@ def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsI
                 # viewer = ImageViewer(img[y1:y2, end:beg])
                 # viewer.show()
         else:
-            print(orgWord)
+            errorReport.write(orgWord + "\n")
 
 
-        for indx in range(len(validCuts)):
-            segmented = cv2.line(segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
+        # for indx in range(len(validCuts)):
+        #     segmented = cv2.line(segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
         # segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
         return segmented, imgsCounter
 
@@ -709,7 +721,7 @@ def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsI
             beg = validCutsFinal[indx]
             end = validCutsFinal[indx + 1]
             name = str(imgsCounter) + ".png"
-            name = "./outputs/" + name
+            name = imgsPath + name
             cv2.imwrite(name, cv2.resize(img[y1:y2, end:beg], (30, 30)))
             if len(laPositions) > 0 and laIndex< len(laPositions) and indx == laPositions[laIndex]:
                 report.write(str(imgsCounter) + ".png" + " " + str(Alphabets[orgWord[indx:indx + 2]]) + "\n")
@@ -722,17 +734,17 @@ def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsI
             # viewer = ImageViewer(img[y1:y2, end:beg])
             # viewer.show()
     else:
-        print(orgWord)
+        errorReport.write(orgWord + "\n")
 
-    for indx in range(len(validCutsFinal)):
-        segmented = cv2.line(segmented, (validCutsFinal[indx], y1), (validCutsFinal[indx], y2), (255, 0, 0), 1)
+    # for indx in range(len(validCutsFinal)):
+    #     segmented = cv2.line(segmented, (validCutsFinal[indx], y1), (validCutsFinal[indx], y2), (255, 0, 0), 1)
 
 
     return segmented, imgsCounter
 
 
 # Function to segment the lines and words in these lines
-def wordSegmentation(image, lineBreaks, maximas, words, report):
+def wordSegmentation(image, lineBreaks, maximas, words, report, errorReport, imgsPath):
     wordCounter = 0
     imgsCounter = 1
     """
@@ -754,7 +766,7 @@ def wordSegmentation(image, lineBreaks, maximas, words, report):
 
         # Hane3mel vertical projection 3adi ba3d
         # Keda hane3mel convolution 3ashan ne smooth el curve
-        window = [1, 1, 1, 1, 1]
+        window = [1, 1, 1]
         horPro = np.sum(line, 0)
         ConvProj = np.convolve(horPro, window)
 
@@ -787,7 +799,11 @@ def wordSegmentation(image, lineBreaks, maximas, words, report):
         # for each word in the current line
         for j in range(len(maximasTest) - 1):
             x2, x1 = maximasTest[j], maximasTest[j + 1]
-            segmented, imgsCounter = subWordSegmentation(image, segmented, y1, y2, x1, x2,maximas[0][i], maxTransitionsIndex, MFV, horPro, words[wordCounter], report, imgsCounter)
+            if np.sum(horPro[x1:x2+1]) == 0:
+                continue
+            if wordCounter >= len(words):
+                break
+            segmented, imgsCounter = subWordSegmentation(image, segmented, y1, y2, x1, x2,maximas[0][i], maxTransitionsIndex, MFV, horPro, words[wordCounter], report, imgsCounter, errorReport, imgsPath)
             segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
             wordCounter +=1
 
