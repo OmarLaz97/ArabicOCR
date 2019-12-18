@@ -60,6 +60,8 @@ Alphabets = {
     "9":50
 }
 
+errors = 0
+
 def find_all(orgString, subString):
    index = -1
    result = []
@@ -406,9 +408,9 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
         # CASE 4:
         # Algorithm: if no baseline between start and end index and projection[cutIndex] < MFV then APPEND
-        if not baselineExistance and projections[cutIndex] < MFV:
-            # filteredCuts.append(cutIndex)
-            continue
+        # if not baselineExistance and projections[cutIndex] < MFV:
+        #     # filteredCuts.append(cutIndex)
+        #     continue
 
         # ############################################ END OF CASE 4 ##################################################
 
@@ -422,10 +424,15 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
         midHeightPos = int((y1 + baseline) / 2)
 
-        doubleCheckLastRegion = min(projections[endIndex], projections[endIndex-1], projections[endIndex-2], projections[endIndex-3])
+        doubleCheckLastRegion = min(projections[endIndex], projections[endIndex-1], projections[endIndex-2], projections[endIndex-3], projections[endIndex-4])
+        # doubleCheckLastRegion = 0
         if cut >= len(cutPositions) and doubleCheckLastRegion == 0 and topLeftHeight > midHeightPos:
             # filteredCuts.append(cutIndex)
             cutPositions[cut-1] = -1
+            continue
+
+        if projections[cutIndex] > MFV + 255:
+            cutPositions[cut - 1] = -1
             continue
 
         # ############################################ END OF CASE 5 ##################################################
@@ -487,8 +494,8 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
             maxHeightPos = y1 + lastZero + 1
 
-            dotsBelow = np.sum(image[baseline + 1:y2, newEndIndex + 1:newStartIndex-1], 1)
-            firstZero = np.where(dotsBelow == 0)[0][0]
+            dotsBelow = np.sum(image[baseline+2:y2, newEndIndex + 1:newStartIndex-2], 1)
+            # firstZero = np.where(dotsBelow == 0)[0][0]
 
             dotsAbove = np.sum(image[y1:baseline, newEndIndex + 1:newStartIndex], 1)
             lastZero = np.where(dotsAbove == 0)[0][-1]
@@ -497,7 +504,7 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
             horProj = np.sum(horProj, 1)
 
             variations = True
-            if max(horProj) <= 3 * 255:
+            if len(horProj) >0 and max(horProj) <= 3 * 255:
                 variations = False
 
             # conditions of STROKE
@@ -508,7 +515,7 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
                 strokes.append(newStartIndex)
                 strokes.append(newEndIndex)
 
-                dotsBelow = np.sum(dotsBelow[firstZero:])
+                dotsBelow = np.sum(dotsBelow)
                 dotsAbove = np.sum(dotsAbove[:lastZero])
 
                 if dotsBelow == 0 and dotsAbove == 0:
@@ -544,15 +551,15 @@ def getFilteredCutPoints(image, x2, y1, y2, currentTransPositions, cutPositions,
 
         maxHeightPos = y1 + lastZero + 1
 
-        dotsBelow = np.sum(image[baseline + 1:y2, newEnd + 1:newStart], 1)
-        firstZero = np.where(dotsBelow == 0)[0][0]
-        dotsBelow = np.sum(dotsBelow[firstZero:])
+        dotsBelow = np.sum(image[baseline + 2:y2, newEnd + 1:newStart], 1)
+        # firstZero = np.where(dotsBelow == 0)[0][0]
+        dotsBelow = np.sum(dotsBelow)
 
         dotsAbove = np.sum(image[y1:baseline, newEnd + 1:newStart], 1)
         lastZero = np.where(dotsAbove == 0)[0][-1]
         dotsAbove = np.sum(dotsAbove[:lastZero])
 
-        if newSumAboveBaseline > newSumBelowBaseline and maxHeightPos < baseline and maxHeightPos > midHeightPos  \
+        if newSumAboveBaseline > newSumBelowBaseline and maxHeightPos < baseline and maxHeightPos >= midHeightPos  \
                 and dotsAbove == 0 and dotsBelow == 0:
             strokes = [newStart, newEnd] + strokes
             dots = [0] + dots
@@ -602,6 +609,8 @@ def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsI
     # viewer = ImageViewer(img[y1:y2, x1:x2])
     # viewer.show()
     # get projection
+    global errors
+
     horPro = np.sum(img[y1:y2, x1:x2], 0)
 
     # get indices of non zeros (to be able to detect the start and end of word and ignore background)
@@ -654,12 +663,13 @@ def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsI
                 # viewer = ImageViewer(img[y1:y2, end:beg])
                 # viewer.show()
         else:
+            errors += 1
             errorReport.write(orgWord + "\n")
 
 
-        # for indx in range(len(validCuts)):
-        #     segmented = cv2.line(segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
-        # segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
+        for indx in range(len(validCuts)):
+            segmented = cv2.line(segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
+        segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
         return segmented, imgsCounter
 
     # getting positions of lines accurately (similar to wordSegmentation function)
@@ -734,10 +744,11 @@ def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsI
             # viewer = ImageViewer(img[y1:y2, end:beg])
             # viewer.show()
     else:
+        errors += 1
         errorReport.write(orgWord + "\n")
 
-    # for indx in range(len(validCutsFinal)):
-    #     segmented = cv2.line(segmented, (validCutsFinal[indx], y1), (validCutsFinal[indx], y2), (255, 0, 0), 1)
+    for indx in range(len(validCutsFinal)):
+        segmented = cv2.line(segmented, (validCutsFinal[indx], y1), (validCutsFinal[indx], y2), (255, 0, 0), 1)
 
 
     return segmented, imgsCounter
@@ -806,5 +817,8 @@ def wordSegmentation(image, lineBreaks, maximas, words, report, errorReport, img
             segmented, imgsCounter = subWordSegmentation(image, segmented, y1, y2, x1, x2,maximas[0][i], maxTransitionsIndex, MFV, horPro, words[wordCounter], report, imgsCounter, errorReport, imgsPath)
             segmented = cv2.rectangle(segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
             wordCounter +=1
+
+    errorReport.write("Error= " + str(errors) + "/" + str(len(words)) + " = " + str((errors*100)/(len(words))) + "% \n")
+    errorReport.write("Accuracy= " + str(len(words) - errors) + "/" + str(len(words)) + " = " + str(100*(len(words) - errors)/(len(words))) + "% \n")
 
     return segmented

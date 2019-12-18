@@ -7,7 +7,8 @@ from utilityFunctions.preProcessing import *
 # Reading the image
 # FIXME: capr1.png bayza 5ales !
 # TODO: Maybe we need to divide pictures with length bigger than a certain threshold ????
-input = "capr14"
+
+input = "capr25"
 img = io.imread("./testImages/"+ str(input) + ".png")
 viewer = ImageViewer(img)
 viewer.show()
@@ -15,11 +16,10 @@ viewer.show()
 with open("./testTexts/" + str(input) + ".txt", encoding='utf-8') as f:
    words = [word for line in f for word in line.split()]
 
-
 errorReport = open("./outputs/" + str(input) + "/ErrorReport.txt", "w", encoding='utf-8')
 errorReport.write((str(len(words))) + "\n")
 
-report = open("./outputs/" + str(input) + "/report.txt", "w")
+report = open("./outputs/" + str(input) + "/AssociationFile.txt", "w")
 
 imgsPath = "./outputs/" + str(input) + "/imgs/"
 
