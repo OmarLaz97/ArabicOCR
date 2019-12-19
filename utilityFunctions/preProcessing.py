@@ -61,6 +61,7 @@ Alphabets = {
 }
 
 errors = 0
+charsArray = []
 
 def find_all(orgString, subString):
    index = -1
@@ -73,7 +74,7 @@ def find_all(orgString, subString):
          break
    return result
 
-# rotation maram
+
 def getRotatedImg(img):
     thresh = img.copy()
     thresh = 1 - (thresh / 255)
@@ -85,12 +86,6 @@ def getRotatedImg(img):
         angle = -(90 + angle)
     else:
         angle = -angle
-
-    (h, w) = img.shape[:2]
-    center = (w // 2, h // 2)
-    M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    rotated = cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-    rotated = 1 - (rotated / 255)
     return angle
 
 
@@ -162,7 +157,7 @@ def Baseline(image):
     :param image: skew corrected binary image
     :return:
     """
-    window = [1, 1, 1, 1, 1, 1]
+    window = [1, 1, 1, 1]
     proj = np.sum(image, 1)
     ConvProj = np.convolve(proj, window)
     maximas = argrelextrema(ConvProj, np.greater)
@@ -609,7 +604,7 @@ def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsI
     # viewer = ImageViewer(img[y1:y2, x1:x2])
     # viewer.show()
     # get projection
-    global errors
+    global errors, charsArray
 
     horPro = np.sum(img[y1:y2, x1:x2], 0)
 
@@ -651,7 +646,9 @@ def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsI
                 end = validCuts[indx+1]
                 name = str(imgsCounter) + ".png"
                 name = imgsPath + name
-                cv2.imwrite(name, cv2.resize(img[y1:y2, end:beg], (30, 30)))
+                charImg = cv2.resize(img[y1:y2, end:beg], (28, 28))
+                cv2.imwrite(name, charImg)
+                charsArray.append(charImg)
                 if len(laPositions) > 0 and laIndex< len(laPositions) and indx == laPositions[laIndex]:
                     report.write(str(imgsCounter) + ".png" + " " + str(Alphabets[orgWord[indx:indx+2]]) + "\n")
                     indx += 1
@@ -732,7 +729,9 @@ def subWordSegmentation(img, segmented, y1,y2, x1, x2, baseline, maxTransitionsI
             end = validCutsFinal[indx + 1]
             name = str(imgsCounter) + ".png"
             name = imgsPath + name
-            cv2.imwrite(name, cv2.resize(img[y1:y2, end:beg], (30, 30)))
+            charImg = cv2.resize(img[y1:y2, end:beg], (28, 28))
+            cv2.imwrite(name, charImg)
+            charsArray.append(charImg)
             if len(laPositions) > 0 and laIndex< len(laPositions) and indx == laPositions[laIndex]:
                 report.write(str(imgsCounter) + ".png" + " " + str(Alphabets[orgWord[indx:indx + 2]]) + "\n")
                 indx += 1
@@ -764,6 +763,9 @@ def wordSegmentation(image, lineBreaks, maximas, words, report, errorReport, img
     :return: words and lines segmented image
     """
     segmented = image.copy()
+
+    global charsArray
+    charsArray = []
 
     # el loop di betlef 3ala kol el line breaks fa betgib kol el lines
     for i in range(len(lineBreaks) - 1):
@@ -821,4 +823,4 @@ def wordSegmentation(image, lineBreaks, maximas, words, report, errorReport, img
     errorReport.write("Error= " + str(errors) + "/" + str(len(words)) + " = " + str((errors*100)/(len(words))) + "% \n")
     errorReport.write("Accuracy= " + str(len(words) - errors) + "/" + str(len(words)) + " = " + str(100*(len(words) - errors)/(len(words))) + "% \n")
 
-    return segmented
+    return segmented, charsArray
