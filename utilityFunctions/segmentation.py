@@ -48,9 +48,10 @@ def find_all(orgString, subString):
     return result
 
 class Segmentation:
-    def __init__(self, Mode, image):
-        self.mode = Mode
+    def __init__(self, image, Mode, Report):
         self.image = image
+        self.mode = Mode
+        self.report = Report
         self.charsArray = []
         self.labels = []
 
@@ -516,8 +517,9 @@ class Segmentation:
                             self.labels.append(Alphabets[orgWord[indx]])
                         indx += 1
                 else:
-                    self.errors += 1
-                    self.errorReport.write(orgWord + "\n")
+                    if self.report:
+                        self.errors += 1
+                        self.errorReport.write(orgWord + "\n")
             else:
                 indx = 0
                 while indx < (len(validCuts) - 1):
@@ -597,8 +599,9 @@ class Segmentation:
                     indx += 1
 
             else:
-                self.errors += 1
-                self.errorReport.write(orgWord + "\n")
+                if self.report:
+                    self.errors += 1
+                    self.errorReport.write(orgWord + "\n")
         else:
             indx = 0
             while indx < (len(validCutsFinal) - 1):
@@ -619,10 +622,11 @@ class Segmentation:
             :return: words and lines segmented image, charsArray and corresponding labels array
             """
 
+        wordsCounter = 0
         # For each line, get start y1, end y2 and baseline
         for i in range(len(lineBreaks) - 1):
             y1, y2 = lineBreaks[i], lineBreaks[i + 1]
-            baseline = maximas[0][i]
+            baseline = maximas[i]
             maxTransitionsIndex = self.getMaxTransitionsIndex(y1, baseline)
 
             line = self.image.copy()
@@ -663,20 +667,27 @@ class Segmentation:
                 x2, x1 = maximasTest[j], maximasTest[j + 1]
                 if np.sum(horPro[x1:x2 + 1]) == 0:
                     continue
+
+                wordsCounter += 1
                 if self.mode == 0 and self.wordCounter >= len(self.words):
                     break
 
-                self.subWordSegmentation(y1, y2, x1, x2, baseline,
-                                                             maxTransitionsIndex, MFV, horPro)
+                # self.subWordSegmentation(y1, y2, x1, x2, baseline, maxTransitionsIndex, MFV, horPro)
+
                 self.segmented = cv2.rectangle(self.segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
+                #
+                # if self.mode == 0:
+                #     self.wordCounter += 1
 
-                if self.mode == 0:
-                    self.wordCounter += 1
-
-        if self.mode == 0:
+        if self.mode == 0 and self.report:
             self.errorReport.write(
                 "Error= " + str(self.errors) + "/" + str(len(self.words)) + " = " + str((self.errors * 100) / (len(self.words))) + "% \n")
             self.errorReport.write("Accuracy= " + str(len(self.words) - self.errors) + "/" + str(len(self.words)) + " = " + str(
                 100 * (len(self.words) - self.errors) / (len(self.words))) + "% \n")
+
+        # if wordsCounter == len(self.words):
+        #     print("equal")
+        # else:
+        #     print("NOT EQUAL", wordsCounter, len(self.words))
 
         return self.segmented, self.charsArray, self.labels
