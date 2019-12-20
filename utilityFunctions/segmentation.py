@@ -210,8 +210,17 @@ class Segmentation:
             # the separation region is valid if there is no connected path between the start and the end index of a current region
             # Algorithm: if no path between start and end index then APPEND
 
-            path, cost = route_through_array(self.costs, start=(maxTransIndex, startIndex), end=(maxTransIndex, endIndex),
+            # path, cost = route_through_array(self.costs, start=(maxTransIndex, startIndex), end=(maxTransIndex, endIndex),
+            #                                  fully_connected=True)
+
+            p = self.costs[y1:y2, endIndex - 5:startIndex + 6]
+            xx1 = 0 + 5
+            xx2 = p.shape[1] - 6
+
+            yy = maxTransIndex - y1
+            path, cost = route_through_array(p, start=(yy, xx1), end=(yy, xx2),
                                              fully_connected=True)
+
             if cost >= 1000:  # no path found, APPEND
                 filteredCuts.append(cutIndex)
                 cutPositions[cut - 1] = -3

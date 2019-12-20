@@ -54,12 +54,18 @@ def segmentationModule(img, Mode, Report):
 
     return charsArray, labelsArray, accuracy
 
+import time
 
 # Reading the image
-input = "capr2"
-img = io.imread("./testImages/" + str(input) + ".png")
-charsArray, labelsArray, accuracy = segmentationModule(img, 0, False)
+for i in range(1, 26):
+    input = "capr" + str(i)
+    img = io.imread("./testImages/" + str(input) + ".png")
+    t1= time.time()
+    charsArray, labelsArray, accuracy = segmentationModule(img, 0, False)
+    t2 = time.time()
 
-
+    print(t2-t1)
+    print(accuracy)
+    print("########################3")
 # Classifcation
-baseModel(charsArray, labelsArray)
+# baseModel(charsArray, labelsArray)
