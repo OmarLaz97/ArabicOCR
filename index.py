@@ -10,7 +10,7 @@ def segmentationModule(img, Mode, Report):
 
     # Transform to binary
     # Thresholding, the surrounding 5 pixels and 10 deducted from the threshold is the best till now
-    newImage = cv2.adaptiveThreshold(newImage, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 5, 20)
+    newImage = cv2.adaptiveThreshold(newImage, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 5, 30)
 
     # Get the Baseline of the image
     baselinedImage, maximas = Baseline(newImage)
@@ -35,6 +35,9 @@ def segmentationModule(img, Mode, Report):
 
     linesWordsSegmented, charsArray, labelsArray = segmentation.wordSegmentation(lineBreaks, maximas)
 
+    outputName = "./outputs/" + str(input) + "/" + str(input) + "Out.png"
+    cv2.imwrite(outputName, linesWordsSegmented)
+
     # if Mode == 0 and Report:
     #     outputName = "./outputs/" + str(input) + "/" + str(input) + "Out.png"
     #     cv2.imwrite(outputName, linesWordsSegmented)
@@ -52,6 +55,7 @@ def segmentationModule(img, Mode, Report):
 
 
 # Reading the image
-input = "capr2"
-img = io.imread("./testImages/" + str(input) + ".png")
-charsArray, labelsArray = segmentationModule(img, 0, False)
+for i in range(1, 2):
+    input = "capr" + str(i)
+    img = io.imread("./testImages/" + str(input) + ".png")
+    charsArray, labelsArray = segmentationModule(img, 0, True)

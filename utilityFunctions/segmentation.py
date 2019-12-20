@@ -383,7 +383,7 @@ class Segmentation:
                         dots.append(0)
                     elif dotsAbove > 0 and dotsAbove > dotsBelow:
                         dots.append(1)
-                    elif dotsBelow > 0 and dotsBelow > dotsAbove:
+                    elif dotsBelow > 0 and dotsBelow >= dotsAbove:
                         dots.append(-1)
 
                     continue
