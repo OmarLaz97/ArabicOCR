@@ -215,6 +215,8 @@ class Segmentation:
             if cost >= 1000:  # no path found, APPEND
                 filteredCuts.append(cutIndex)
                 cutPositions[cut - 1] = -3
+                if cut - 2 >=0 and cutPositions[cut - 2] > 0:
+                    filteredCuts.append(cutPositions[cut-2])
                 continue
 
             # ############################################ END OF CASE 1 ##################################################
@@ -228,7 +230,7 @@ class Segmentation:
             yy = p.shape[0] - 1
             path, cost = route_through_array(p, start=(yy, xx1), end=(yy, xx2),
                                              fully_connected=True)
-            if cost < 2000:  # path found
+            if cost < 2000 and (projections[cutIndex] > MFV):  # path found
                 p = self.costs[maxTransIndex: y2, endIndex - 1:startIndex + 2]
                 xx1 = 0 + 1
                 xx2 = p.shape[1] - 2
@@ -517,8 +519,8 @@ class Segmentation:
                             self.labels.append(Alphabets[orgWord[indx]])
                         indx += 1
                 else:
+                    self.errors += 1
                     if self.report:
-                        self.errors += 1
                         self.errorReport.write(orgWord + "\n")
             else:
                 indx = 0
@@ -599,8 +601,8 @@ class Segmentation:
                     indx += 1
 
             else:
+                self.errors += 1
                 if self.report:
-                    self.errors += 1
                     self.errorReport.write(orgWord + "\n")
         else:
             indx = 0
@@ -690,4 +692,6 @@ class Segmentation:
         # else:
         #     print("NOT EQUAL", wordsCounter, len(self.words))
 
-        return self.segmented, self.charsArray, self.labels
+        accuracy = 100 * (len(self.words) - self.errors) / (len(self.words))
+
+        return self.segmented, self.charsArray, self.labels, accuracy
