@@ -35,24 +35,15 @@ def segmentationModule(img, Mode, Report):
 
         segmentation.setTrainingEnv(words, errorReport)
 
-    linesWordsSegmented, charsArray, labelsArray, accuracy = segmentation.wordSegmentation(lineBreaks, maximas)
+    linesWordsSegmented, charsArray, labelsArray, lengthArray, accuracy = segmentation.wordSegmentation(lineBreaks, maximas)
 
-    # outputName = "./outputs/" + str(input) + "/" + str(input) + "Out.png"
-    # cv2.imwrite(outputName, linesWordsSegmented)
 
     # if Mode == 0 and Report:
     #     outputName = "./outputs/" + str(input) + "/" + str(input) + "Out.png"
     #     cv2.imwrite(outputName, linesWordsSegmented)
-    #
-    #     report = open("./outputs/" + str(input) + "/AssociationFile.txt", "w")
-    #     imgsPath = "./outputs/" + str(input) + "/imgs/"
-    #
-    #     for indx in range(len(charsArray)):
-    #         charImg = charsArray[indx]
-    #         cv2.imwrite(imgsPath + str(indx + 1) + ".png", charImg)
-    #         report.write(str(indx + 1) + ".png" + " " + str(labelsArray[indx]) + "\n")
 
-    return charsArray, labelsArray, accuracy
+
+    return charsArray, labelsArray, lengthArray, accuracy
 
 import time
 
@@ -61,11 +52,12 @@ for i in range(1, 26):
     input = "capr" + str(i)
     img = io.imread("./testImages/" + str(input) + ".png")
     t1= time.time()
-    charsArray, labelsArray, accuracy = segmentationModule(img, 0, False)
+    charsArray, labelsArray, lengthArray, accuracy = segmentationModule(img, 0, False)
     t2 = time.time()
-
-    print(t2-t1)
-    print(accuracy)
-    print("########################3")
+    #
+    # print(t2-t1)
+    # print(accuracy)
+    # print(lengthArray)
+    # print("########################3")
 # Classifcation
 # baseModel(charsArray, labelsArray)

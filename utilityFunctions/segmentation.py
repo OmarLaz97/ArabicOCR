@@ -54,6 +54,7 @@ class Segmentation:
         self.report = Report
         self.charsArray = []
         self.labels = []
+        self.lengthArray = []
 
         # get array of costs for the path finding
         T, F = True, False
@@ -514,6 +515,7 @@ class Segmentation:
                 laIndex = 0
 
                 if wordLength == (len(orgWord) - len(laPositions)):
+                    self.lengthArray.append(wordLength)
                     indx = 0
                     while indx < (len(validCuts) - 1):
                         beg = validCuts[indx]
@@ -532,6 +534,7 @@ class Segmentation:
                     if self.report:
                         self.errorReport.write(orgWord + "\n")
             else:
+                self.lengthArray.append(wordLength)
                 indx = 0
                 while indx < (len(validCuts) - 1):
                     beg = validCuts[indx]
@@ -581,19 +584,21 @@ class Segmentation:
         validCutsFinal.sort(reverse=True)
         validCutsFinal = list(dict.fromkeys(validCutsFinal))
 
+        k = 0
+        while k < len(validCutsFinal) - 1:
+            if abs(validCutsFinal[k] - validCutsFinal[k + 1]) <= 2:
+                validCutsFinal.pop(k + 1)
+            k += 1
+        wordLength = len(validCutsFinal) - 1
+
         if self.mode == 0:
             orgWord = self.words[self.wordCounter]
-            k = 0
-            while k < len(validCutsFinal) - 1:
-                if abs(validCutsFinal[k] - validCutsFinal[k + 1]) <= 2:
-                    validCutsFinal.pop(k + 1)
-                k += 1
-            wordLength = len(validCutsFinal) - 1
 
             laPositions = find_all(orgWord, "لا")
             laIndex = 0
 
             if wordLength == (len(orgWord) - len(laPositions)):
+                self.lengthArray.append(wordLength)
                 indx = 0
                 while indx < (len(validCutsFinal) - 1):
                     beg = validCutsFinal[indx]
@@ -614,6 +619,7 @@ class Segmentation:
                 if self.report:
                     self.errorReport.write(orgWord + "\n")
         else:
+            self.lengthArray.append(wordLength)
             indx = 0
             while indx < (len(validCutsFinal) - 1):
                 beg = validCutsFinal[indx]
@@ -703,4 +709,4 @@ class Segmentation:
 
         accuracy = 100 * (len(self.words) - self.errors) / (len(self.words))
 
-        return self.segmented, self.charsArray, self.labels, accuracy
+        return self.segmented, self.charsArray, self.labels, self.lengthArray, accuracy
