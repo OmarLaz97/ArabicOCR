@@ -1,5 +1,6 @@
 import skimage.io as io
 
+from classification.benchmark import *
 from utilityFunctions.preProcessing import *
 from utilityFunctions.segmentation import *
 
@@ -47,7 +48,6 @@ def segmentationModule(img, Mode, Report):
     #         cv2.imwrite(imgsPath + str(indx + 1) + ".png", charImg)
     #         report.write(str(indx + 1) + ".png" + " " + str(labelsArray[indx]) + "\n")
 
-
     return charsArray, labelsArray
 
 
@@ -55,3 +55,6 @@ def segmentationModule(img, Mode, Report):
 input = "capr2"
 img = io.imread("./testImages/" + str(input) + ".png")
 charsArray, labelsArray = segmentationModule(img, 0, False)
+
+# Classifcation
+baseModel(charsArray, labelsArray)
