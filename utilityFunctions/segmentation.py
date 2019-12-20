@@ -672,12 +672,12 @@ class Segmentation:
                 if self.mode == 0 and self.wordCounter >= len(self.words):
                     break
 
-                # self.subWordSegmentation(y1, y2, x1, x2, baseline, maxTransitionsIndex, MFV, horPro)
+                self.subWordSegmentation(y1, y2, x1, x2, baseline, maxTransitionsIndex, MFV, horPro)
 
                 self.segmented = cv2.rectangle(self.segmented, (x1, y1), (x2, y2), (255, 0, 0), 1)
-                #
-                # if self.mode == 0:
-                #     self.wordCounter += 1
+
+                if self.mode == 0:
+                    self.wordCounter += 1
 
         if self.mode == 0 and self.report:
             self.errorReport.write(
