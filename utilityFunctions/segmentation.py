@@ -568,6 +568,7 @@ class Segmentation:
                     end = validCuts[indx + 1]
                     charImg = cv2.resize(self.image[y1:y2, end:beg], (28, 28))
                     self.charsArray.append(charImg)
+                    indx += 1
 
             for indx in range(len(validCuts)):
                 self.segmented = cv2.line(self.segmented, (validCuts[indx], y1), (validCuts[indx], y2), (255, 0, 0), 1)
@@ -653,6 +654,7 @@ class Segmentation:
                 end = validCutsFinal[indx + 1]
                 charImg = cv2.resize(self.image[y1:y2, end:beg], (28, 28))
                 self.charsArray.append(charImg)
+                indx +=1
 
 
         for indx in range(len(validCutsFinal)):
@@ -734,6 +736,9 @@ class Segmentation:
         # else:
         #     print("NOT EQUAL", wordsCounter, len(self.words))
 
-        accuracy = 100 * (len(self.words) - self.errors) / (len(self.words))
+        if self.mode == 0:
+            accuracy = 100 * (len(self.words) - self.errors) / (len(self.words))
+        else:
+            accuracy = 0
 
         return self.segmented, self.charsArray, self.labels, self.lengthArray, accuracy
