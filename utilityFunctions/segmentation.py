@@ -253,6 +253,33 @@ class Segmentation:
                     # filteredCuts.append(cutIndex)
                     cutPositions[cut - 1] = -2
                     continue
+            else:
+                tempStartIndex = startIndex + 1
+                while self.image[maxTransIndex, tempStartIndex] == 255:
+                    tempStartIndex += 1
+                tempStartIndex -= 1
+                p = self.costs[y1:maxTransIndex + 1, endIndex - 1:tempStartIndex + 2]
+                xx1 = 0 + 1
+                xx2 = p.shape[1] - 2
+
+                yy = p.shape[0] - 1
+                path, cost = route_through_array(p, start=(yy, xx1), end=(yy, xx2),
+                                                 fully_connected=True)
+
+                if cost < 2000 and (projections[cutIndex] > MFV):  # path found
+                    p = self.costs[maxTransIndex: y2, endIndex - 1:tempStartIndex + 2]
+                    xx1 = 0 + 1
+                    xx2 = p.shape[1] - 2
+
+                    yy = 0
+                    path, cost = route_through_array(p, start=(yy, xx1), end=(yy, xx2),
+                                                     fully_connected=True)
+
+                    if cost < 2000:  # path found --> loop, IGNORE
+                        # filteredCuts.append(cutIndex)
+                        cutPositions[cut - 1] = -2
+                        continue
+
             # ############################################ END OF CASE 2 ##################################################
 
             # CASE3: seen, sheen, sad, dad, qaf, noon at the end of sub-word handling:
@@ -297,7 +324,7 @@ class Segmentation:
             doubleCheckLastRegion = min(projections[endIndex], projections[endIndex - 1], projections[endIndex - 2],
                                         projections[endIndex - 3], projections[endIndex - 4])
             # doubleCheckLastRegion = 0
-            if cut >= len(cutPositions) and doubleCheckLastRegion == 0 and topLeftHeight > midHeightPos:
+            if cut >= len(cutPositions) and doubleCheckLastRegion == 0 and topLeftHeight > midHeightPos and cutIndex - endIndex < 7:
                 # filteredCuts.append(cutIndex)
                 cutPositions[cut - 1] = -1
                 continue
@@ -367,7 +394,7 @@ class Segmentation:
 
                 maxHeightPos = y1 + lastZero + 1
 
-                dotsBelow = np.sum(self.image[baseline + 2:y2, newEndIndex + 1:newStartIndex - 2], 1)
+                dotsBelow = np.sum(self.image[baseline + 2:y2, newEndIndex + 1:newStartIndex], 1)
                 # firstZero = np.where(dotsBelow == 0)[0][0]
 
                 dotsAbove = np.sum(self.image[y1:baseline, newEndIndex + 1:newStartIndex], 1)

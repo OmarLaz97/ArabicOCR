@@ -39,14 +39,14 @@ def segmentationModule(img, Mode, Report):
 
 
     # if Mode == 0 and Report:
-    #     outputName = "./outputs/" + str(input) + "/" + str(input) + "Out.png"
-    #     cv2.imwrite(outputName, linesWordsSegmented)
+    # outputName = "./outputs/" + str(input) + "/" + str(input) + "Out.png"
+    # cv2.imwrite(outputName, linesWordsSegmented)
 
 
     return charsArray, labelsArray, lengthArray, accuracy
 
 import time
-
+# acc = open("./outputs/AccuracyRuntime2.txt", "w", encoding='utf-8')
 # Reading the image
 for i in range(1, 26):
     input = "capr" + str(i)
@@ -54,10 +54,11 @@ for i in range(1, 26):
     t1= time.time()
     charsArray, labelsArray, lengthArray, accuracy = segmentationModule(img, 0, False)
     t2 = time.time()
-    #
+
+    # acc.write(input + "\t" + str(accuracy) + "\t" + str(t2-t1) + "\n")
     # print(t2-t1)
     # print(accuracy)
-    # print(lengthArray)
-    # print("########################3")
+
+
 # Classifcation
 # baseModel(charsArray, labelsArray)
