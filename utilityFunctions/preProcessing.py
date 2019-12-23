@@ -77,10 +77,13 @@ def getAngle(img):
         angle = -angle
     return angle
 
-def getRotatedImg(img):
+def getRotatedImg(img, Repeat = False):
     # Skew Correction
     # Getting first the right angle of rotation, then rotating the original image
-    angle = getAngle(img)
+    if Repeat == True:
+        angle = skewNormal(img)
+    else:
+        angle = getAngle(img)
     newImage = trans.rotate(img, angle, mode="edge")
     newImage = (newImage * 255).astype(np.uint8)
     return newImage

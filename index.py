@@ -5,9 +5,9 @@ from utilityFunctions.preProcessing import *
 from utilityFunctions.segmentation import *
 
 
-def segmentationModule(img, Mode, Report):
+def segmentationModule(img, Mode, Report, Repeat = False):
     # Skew Correction
-    newImage = getRotatedImg(img)
+    newImage = getRotatedImg(img, Repeat)
 
     # Transform to binary
     # Thresholding, the surrounding 5 pixels and 10 deducted from the threshold is the best till now
@@ -37,6 +37,9 @@ def segmentationModule(img, Mode, Report):
 
     linesWordsSegmented, charsArray, labelsArray, lengthArray, accuracy = segmentation.wordSegmentation(lineBreaks, maximas)
 
+    if accuracy < 60:
+        charsArray, labelsArray, lengthArray, accuracy = segmentationModule(img, Mode, Report, True)
+
 
     # if Mode == 0 and Report:
     # outputName = "./outputs/" + str(input) + "/" + str(input) + "Out.png"
@@ -48,8 +51,8 @@ def segmentationModule(img, Mode, Report):
 import time
 # acc = open("./outputs/AccuracyRuntime2.txt", "w", encoding='utf-8')
 # Reading the image
-for i in range(1, 2):
-    input = "cmar1708"
+for i in range(12, 13):
+    input = "cfeb665"
     img = io.imread("./testImages/" + str(input) + ".png")
     t1= time.time()
     charsArray, labelsArray, lengthArray, accuracy = segmentationModule(img, 0, False)
