@@ -48,16 +48,16 @@ def segmentationModule(img, Mode, Report):
 import time
 # acc = open("./outputs/AccuracyRuntime2.txt", "w", encoding='utf-8')
 # Reading the image
-for i in range(1, 26):
-    input = "capr" + str(i)
+for i in range(1, 2):
+    input = "cmar1708"
     img = io.imread("./testImages/" + str(input) + ".png")
     t1= time.time()
     charsArray, labelsArray, lengthArray, accuracy = segmentationModule(img, 0, False)
     t2 = time.time()
 
     # acc.write(input + "\t" + str(accuracy) + "\t" + str(t2-t1) + "\n")
-    # print(t2-t1)
-    # print(accuracy)
+    print(t2-t1)
+    print(accuracy)
 
 
 # Classifcation

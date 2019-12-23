@@ -222,7 +222,9 @@ class Segmentation:
             path, cost = route_through_array(p, start=(yy, xx1), end=(yy, xx2),
                                              fully_connected=True)
 
-            if cost >= 1000:  # no path found, APPEND
+            if cost >= 1000 and projections[cutIndex] <= MFV:  # no path found, APPEND
+                # x = np.sum(self.image[y1:maxTransIndex, endIndex:startIndex])
+                # if x <= 255:
                 filteredCuts.append(cutIndex)
                 cutPositions[cut - 1] = -3
                 if cut - 2 >=0 and cutPositions[cut - 2] > 0:
@@ -385,11 +387,19 @@ class Segmentation:
                 midHeightPos = int((y1 + baseline) / 2)
 
                 newSumBelowBaseline = np.sum(self.image[baseline + 1:y2, newEndIndex + 1:newStartIndex], 1)
-                firstZero = np.where(newSumBelowBaseline == 0)[0][0]
+                firstZero = np.where(newSumBelowBaseline == 0)[0]
+                if len(firstZero) > 0:
+                    firstZero = firstZero[0]
+                else:
+                    firstZero = len(newSumBelowBaseline)
                 newSumBelowBaseline = np.sum(newSumBelowBaseline[0:firstZero])
 
                 newSumAboveBaseline = np.sum(self.image[y1:baseline, newEndIndex + 1:newStartIndex], 1)
-                lastZero = np.where(newSumAboveBaseline == 0)[0][-1]
+                lastZero = np.where(newSumAboveBaseline == 0)[0]
+                if len(lastZero) > 0:
+                    lastZero = lastZero[-1]
+                else:
+                    lastZero = 0
                 newSumAboveBaseline = np.sum(newSumAboveBaseline[lastZero:])
 
                 maxHeightPos = y1 + lastZero + 1
@@ -398,9 +408,15 @@ class Segmentation:
                 # firstZero = np.where(dotsBelow == 0)[0][0]
 
                 dotsAbove = np.sum(self.image[y1:baseline, newEndIndex + 1:newStartIndex], 1)
-                lastZero = np.where(dotsAbove == 0)[0][-1]
+                lastZero = np.where(dotsAbove == 0)[0]
+                if len(lastZero) > 0:
+                    lastZero = lastZero[-1]
+                    horProj = self.image[y1 + lastZero: maxTransIndex, newEndIndex: newStartIndex + 1]
+                else:
+                    lastZero = len(dotsAbove)
+                    horProj = self.image[y1: maxTransIndex, newEndIndex: newStartIndex + 1]
 
-                horProj = self.image[y1 + lastZero: maxTransIndex, newEndIndex: newStartIndex + 1]
+
                 horProj = np.sum(horProj, 1)
 
                 variations = True
@@ -429,7 +445,6 @@ class Segmentation:
 
                 else:
                     # segment is not a stroke, valid -> APPEND the 2 cuts and continue
-
                     filteredCuts.append(newStartIndex)
                     filteredCuts.append(newEndIndex)
                     # segmented = cv2.rectangle(segmented, (newEndIndex, y1), (newStartIndex, y2), (255, 0, 0), 1)
@@ -442,11 +457,19 @@ class Segmentation:
             newEnd = cutPositions[0]
 
             newSumBelowBaseline = np.sum(self.image[baseline + 1:y2, newEnd + 1:newStart], 1)
-            firstZero = np.where(newSumBelowBaseline == 0)[0][0]
+            firstZero = np.where(newSumBelowBaseline == 0)[0]
+            if len(firstZero) > 0:
+                firstZero = firstZero[0]
+            else:
+                firstZero = len(newSumBelowBaseline)
             newSumBelowBaseline = np.sum(newSumBelowBaseline[0:firstZero])
 
             newSumAboveBaseline = np.sum(self.image[y1:baseline, newEnd + 1:newStart], 1)
-            lastZero = np.where(newSumAboveBaseline == 0)[0][-1]
+            lastZero = np.where(newSumAboveBaseline == 0)[0]
+            if len(lastZero) > 0:
+                lastZero = lastZero[-1]
+            else:
+                lastZero = 0
             newSumAboveBaseline = np.sum(newSumAboveBaseline[lastZero:])
 
             maxHeightPos = y1 + lastZero + 1
