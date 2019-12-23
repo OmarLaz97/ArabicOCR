@@ -37,7 +37,7 @@ def segmentationModule(img, Mode, Report, Repeat = False):
 
     linesWordsSegmented, charsArray, labelsArray, lengthArray, accuracy = segmentation.wordSegmentation(lineBreaks, maximas)
 
-    if accuracy < 60:
+    if accuracy < 60 and Mode == 0:
         charsArray, labelsArray, lengthArray, accuracy = segmentationModule(img, Mode, Report, True)
 
 
