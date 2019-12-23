@@ -55,6 +55,7 @@ class Segmentation:
         self.charsArray = []
         self.labels = []
         self.lengthArray = []
+        self.lastChar = []
 
         # get array of costs for the path finding
         T, F = True, False
@@ -570,6 +571,7 @@ class Segmentation:
                     while indx < (len(validCuts) - 1):
                         beg = validCuts[indx]
                         end = validCuts[indx + 1]
+                        self.lastChar = self.image[y1:y2, end:beg]
                         charImg = cv2.resize(self.image[y1:y2, end:beg], (28, 28))
                         self.charsArray.append(charImg)
                         if len(laPositions) > 0 and laIndex < len(laPositions) and indx == laPositions[laIndex]:
@@ -589,6 +591,7 @@ class Segmentation:
                 while indx < (len(validCuts) - 1):
                     beg = validCuts[indx]
                     end = validCuts[indx + 1]
+                    self.lastChar = self.image[y1:y2, end:beg]
                     charImg = cv2.resize(self.image[y1:y2, end:beg], (28, 28))
                     self.charsArray.append(charImg)
                     indx += 1
@@ -654,6 +657,7 @@ class Segmentation:
                 while indx < (len(validCutsFinal) - 1):
                     beg = validCutsFinal[indx]
                     end = validCutsFinal[indx + 1]
+                    self.lastChar = self.image[y1:y2, end:beg]
                     charImg = cv2.resize(self.image[y1:y2, end:beg], (28, 28))
                     self.charsArray.append(charImg)
                     if len(laPositions) > 0 and laIndex < len(laPositions) and indx == laPositions[laIndex]:
@@ -675,6 +679,7 @@ class Segmentation:
             while indx < (len(validCutsFinal) - 1):
                 beg = validCutsFinal[indx]
                 end = validCutsFinal[indx + 1]
+                self.lastChar = self.image[y1:y2, end:beg]
                 charImg = cv2.resize(self.image[y1:y2, end:beg], (28, 28))
                 self.charsArray.append(charImg)
                 indx +=1
@@ -763,5 +768,13 @@ class Segmentation:
             accuracy = 100 * (len(self.words) - self.errors) / (len(self.words))
         else:
             accuracy = 0
+
+        lastCharProj = np.sum(self.lastChar, 0)
+        lastCharNonZeros = np.where(lastCharProj != 0)
+        if len(lastCharNonZeros[0]) > 0:
+            firstNonZero = lastCharNonZeros[0][0]
+            self.lastChar = self.lastChar[:, firstNonZero:]
+
+        self.charsArray[-1] = self.lastChar
 
         return self.segmented, self.charsArray, self.labels, self.lengthArray, accuracy
